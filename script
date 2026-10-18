@@ -1,550 +1,174 @@
--- [RATMAN4080 BUILD] Flick Hub v1.0
--- Tema: Mor (#9B59B6) / Siyah (#0D0D0D)
--- Mimari: Client-Side Only (Anti-Cheat Safe)
--- Not: Server-side replication gerektiren özellikler (one-tap, mevlana) 
---       sadece LOCAL olarak çalışır. Anti-cheat bypass için 
---       hiçbir RemoteEvent'e yazma yapılmaz.
+-- [RATMAN4080 BUILD] Raffle Hub v2 - Standalone
+-- Menü: RightShift | Aimbot: E
+-- GitHub'a yapıştırılacak tek dosya. Loader buna çekilecek.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local LocalPlayer = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
+local UIS = game:GetService("UserInputService")
+local LP = Players.LocalPlayer
+local Cam = workspace.CurrentCamera
 
 -- ═══════════════════════════════════════
--- CONFIG & STATE
+-- CONFIG
 -- ═══════════════════════════════════════
-local Config = {
-    ESP = {
-        Enabled = false,
-        Box = { Enabled = false, Color = Color3.fromRGB(155, 89, 182), Thickness = 2 },
-        Name = { Enabled = false, Color = Color3.fromRGB(255, 255, 255), Size = 14 },
-        Health = { Enabled = false, Width = 4 },
-        Distance = { Enabled = false, MaxRange = 500 },
-        Keybind = Enum.KeyCode.E
-    },
-    Aimbot = {
-        Enabled = false,
-        FOV = 150,
-        Smoothness = 0.15,
-        TargetPart = "Head",
-        TeamCheck = true,
-        Keybind = Enum.KeyCode.RButton
-    },
-    Absurd = {
-        RainbowBody = false,
-        RainbowWeapon = false,
-        OneTap = false,          -- LOCAL ONLY (visual hit reg override)
-        BigHeads = false,
-        HeadScale = 3.0,
-        SuperSpeed = false,
-        SpeedValue = 50,
-        SuperJump = false,
-        JumpPower = 100,
-        ThirdPerson = false,
-        Mevlana = false,         -- LOCAL SPIN VISUAL
-        MevlanaSpeed = 10
-    },
-    Settings = {
-        MenuToggle = Enum.KeyCode.Insert,
-        ResetConfig = false
-    }
+local CFG = {
+    MenuKey = Enum.KeyCode.RightShift,
+    AimKey = Enum.KeyCode.E,
+    AimFOV = 180,
+    AimSmooth = 0.12,
+    AimTeamCheck = true,
+    ESP = false,
+    Rainbow = false,
+    BigHead = false,
+    Speed = false,
+    SpeedVal = 60,
+    Jump = false,
+    JumpVal = 120
 }
 
 -- ═══════════════════════════════════════
--- UI LIBRARY (Custom Purple/Black)
+-- UI (Mor/Siyah Minimal)
 -- ═══════════════════════════════════════
-local function createUI()
-    local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "FlickHub_4080"
-    ScreenGui.ResetOnSpawn = false
-    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+local function buildUI()
+    local sg = Instance.new("ScreenGui", LP:WaitForChild("PlayerGui"))
+    sg.Name = "RaffleHub4080"
+    sg.ResetOnSpawn = false
 
-    -- Main Frame
-    local Main = Instance.new("Frame")
-    Main.Name = "Main"
-    Main.Size = UDim2.new(0, 520, 0, 380)
-    Main.Position = UDim2.new(0.5, -260, 0.5, -190)
-    Main.BackgroundColor3 = Color3.fromRGB(13, 13, 13)
-    Main.BorderSizePixel = 0
-    Main.Visible = true
-    Main.Parent = ScreenGui
+    local main = Instance.new("Frame", sg)
+    main.Size = UDim2.new(0,320,0,260)
+    main.Position = UDim2.new(0.5,-160,0.5,-130)
+    main.BackgroundColor3 = Color3.fromRGB(13,13,13)
+    main.BorderSizePixel = 0
+    main.Visible = false
+    Instance.new("UICorner", main).CornerRadius = UDim.new(0,8)
+    local st = Instance.new("UIStroke", main)
+    st.Color = Color3.fromRGB(155,89,182)
+    st.Thickness = 2
 
-    local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UDim.new(0, 8)
-    Corner.Parent = Main
+    local title = Instance.new("TextLabel", main)
+    title.Size = UDim2.new(1,0,0,30)
+    title.BackgroundTransparency = 1
+    title.Text = "RAFFLE HUB | 4080"
+    title.TextColor3 = Color3.fromRGB(155,89,182)
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 14
 
-    local Stroke = Instance.new("UIStroke")
-    Stroke.Color = Color3.fromRGB(155, 89, 182)
-    Stroke.Thickness = 2
-    Stroke.Parent = Main
+    local list = Instance.new("ScrollingFrame", main)
+    list.Size = UDim2.new(1,-12,1,-38)
+    list.Position = UDim2.new(0,6,0,34)
+    list.BackgroundTransparency = 1
+    list.ScrollBarThickness = 3
+    Instance.new("UIListLayout", list).Padding = UDim.new(0,4)
 
-    -- Title Bar
-    local Title = Instance.new("TextLabel")
-    Title.Size = UDim2.new(1, 0, 0, 36)
-    Title.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-    Title.Text = "FLICK HUB v1.0 | ratman4080"
-    Title.TextColor3 = Color3.fromRGB(155, 89, 182)
-    Title.Font = Enum.Font.GothamBold
-    Title.TextSize = 16
-    Title.Parent = Main
-
-    -- Tab Buttons Container
-    local TabBar = Instance.new("Frame")
-    TabBar.Size = UDim2.new(1, 0, 0, 32)
-    TabBar.Position = UDim2.new(0, 0, 0, 36)
-    TabBar.BackgroundTransparency = 1
-    TabBar.Parent = Main
-
-    local TabLayout = Instance.new("UIListLayout")
-    TabLayout.FillDirection = Enum.FillDirection.Horizontal
-    TabLayout.Padding = UDim.new(0, 2)
-    TabLayout.Parent = TabBar
-
-    -- Content Area
-    local Content = Instance.new("Frame")
-    Content.Name = "Content"
-    Content.Size = UDim2.new(1, -16, 1, -84)
-    Content.Position = UDim2.new(0, 8, 0, 76)
-    Content.BackgroundTransparency = 1
-    Content.Parent = Main
-
-    local Tabs = {}
-    local ActiveTab = nil
-
-    local function createTab(name)
-        local Btn = Instance.new("TextButton")
-        Btn.Size = UDim2.new(0.25, -2, 1, 0)
-        Btn.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-        Btn.Text = name
-        Btn.TextColor3 = Color3.fromRGB(180, 180, 180)
-        Btn.Font = Enum.Font.GothamSemibold
-        Btn.TextSize = 13
-        Btn.Parent = TabBar
-
-        local Page = Instance.new("ScrollingFrame")
-        Page.Size = UDim2.new(1, 0, 1, 0)
-        Page.BackgroundTransparency = 1
-        Page.ScrollBarThickness = 4
-        Page.ScrollBarImageColor3 = Color3.fromRGB(155, 89, 182)
-        Page.Visible = false
-        Page.Parent = Content
-
-        local List = Instance.new("UIListLayout")
-        List.Padding = UDim.new(0, 6)
-        List.Parent = Page
-
-        table.insert(Tabs, { Button = Btn, Page = Page })
-
-        Btn.MouseButton1Click:Connect(function()
-            for _, t in ipairs(Tabs) do
-                t.Page.Visible = false
-                t.Button.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-                t.Button.TextColor3 = Color3.fromRGB(180, 180, 180)
-            end
-            Page.Visible = true
-            Btn.BackgroundColor3 = Color3.fromRGB(155, 89, 182)
-            Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-            ActiveTab = name
-        end)
-
-        return Page
-    end
-
-    -- Toggle Helper
-    local function addToggle(parent, label, configTable, key)
-        local Frame = Instance.new("Frame")
-        Frame.Size = UDim2.new(1, -8, 0, 28)
-        Frame.BackgroundTransparency = 1
-        Frame.Parent = parent
-
-        local Lbl = Instance.new("TextLabel")
-        Lbl.Size = UDim2.new(1, -50, 1, 0)
-        Lbl.Position = UDim2.new(0, 4, 0, 0)
-        Lbl.BackgroundTransparency = 1
-        Lbl.Text = label
-        Lbl.TextColor3 = Color3.fromRGB(220, 220, 220)
-        Lbl.Font = Enum.Font.Gotham
-        Lbl.TextSize = 13
-        Lbl.TextXAlignment = Enum.TextXAlignment.Left
-        Lbl.Parent = Frame
-
-        local Btn = Instance.new("TextButton")
-        Btn.Size = UDim2.new(0, 40, 0, 22)
-        Btn.Position = UDim2.new(1, -44, 0, 3)
-        Btn.BackgroundColor3 = configTable[key] and Color3.fromRGB(155, 89, 182) or Color3.fromRGB(40, 40, 40)
-        Btn.Text = configTable[key] and "ON" or "OFF"
-        Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        Btn.Font = Enum.Font.GothamBold
-        Btn.TextSize = 11
-        Btn.Parent = Frame
-
-        local C = Instance.new("UICorner")
-        C.CornerRadius = UDim.new(0, 4)
-        C.Parent = Btn
-
-        Btn.MouseButton1Click:Connect(function()
-            configTable[key] = not configTable[key]
-            Btn.BackgroundColor3 = configTable[key] and Color3.fromRGB(155, 89, 182) or Color3.fromRGB(40, 40, 40)
-            Btn.Text = configTable[key] and "ON" or "OFF"
+    local function toggle(label, key)
+        local f = Instance.new("TextButton", list)
+        f.Size = UDim2.new(1,0,0,26)
+        f.BackgroundColor3 = Color3.fromRGB(25,25,25)
+        f.Text = label .. ": OFF"
+        f.TextColor3 = Color3.fromRGB(200,200,200)
+        f.Font = Enum.Font.Gotham
+        f.TextSize = 12
+        Instance.new("UICorner", f).CornerRadius = UDim.new(0,4)
+        f.MouseButton1Click:Connect(function()
+            CFG[key] = not CFG[key]
+            f.Text = label .. (CFG[key] and ": ON" or ": OFF")
+            f.TextColor3 = CFG[key] and Color3.fromRGB(155,89,182) or Color3.fromRGB(200,200,200)
         end)
     end
 
-    -- Slider Helper
-    local function addSlider(parent, label, configTable, key, min, max)
-        local Frame = Instance.new("Frame")
-        Frame.Size = UDim2.new(1, -8, 0, 36)
-        Frame.BackgroundTransparency = 1
-        Frame.Parent = parent
+    toggle("ESP", "ESP")
+    toggle("Rainbow Body", "Rainbow")
+    toggle("Big Heads", "BigHead")
+    toggle("Super Speed", "Speed")
+    toggle("Super Jump", "Jump")
 
-        local Lbl = Instance.new("TextLabel")
-        Lbl.Size = UDim2.new(1, -50, 0, 16)
-        Lbl.Position = UDim2.new(0, 4, 0, 0)
-        Lbl.BackgroundTransparency = 1
-        Lbl.Text = string.format("%s: %d", label, configTable[key])
-        Lbl.TextColor3 = Color3.fromRGB(220, 220, 220)
-        Lbl.Font = Enum.Font.Gotham
-        Lbl.TextSize = 13
-        Lbl.TextXAlignment = Enum.TextXAlignment.Left
-        Lbl.Parent = Frame
-
-        local SliderBg = Instance.new("Frame")
-        SliderBg.Size = UDim2.new(1, -8, 0, 10)
-        SliderBg.Position = UDim2.new(0, 4, 0, 20)
-        SliderBg.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-        SliderBg.Parent = Frame
-
-        local SC = Instance.new("UICorner")
-        SC.CornerRadius = UDim.new(0, 5)
-        SC.Parent = SliderBg
-
-        local Fill = Instance.new("Frame")
-        Fill.Size = UDim2.new((configTable[key] - min) / (max - min), 0, 1, 0)
-        Fill.BackgroundColor3 = Color3.fromRGB(155, 89, 182)
-        Fill.Parent = SliderBg
-
-        local FC = Instance.new("UICorner")
-        FC.CornerRadius = UDim.new(0, 5)
-        FC.Parent = Fill
-
-        local dragging = false
-        SliderBg.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                dragging = true
-            end
-        end)
-        SliderBg.InputEnded:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                dragging = false
-            end
-        end)
-        UserInputService.InputChanged:Connect(function(input)
-            if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-                local rel = math.clamp((input.Position.X - SliderBg.AbsolutePosition.X) / SliderBg.AbsoluteSize.X, 0, 1)
-                configTable[key] = math.floor(min + rel * (max - min))
-                Fill.Size = UDim2.new(rel, 0, 1, 0)
-                Lbl.Text = string.format("%s: %d", label, configTable[key])
-            end
-        end)
-    end
-
-    -- Keybind Helper
-    local function addKeybind(parent, label, configTable, key)
-        local Frame = Instance.new("Frame")
-        Frame.Size = UDim2.new(1, -8, 0, 28)
-        Frame.BackgroundTransparency = 1
-        Frame.Parent = parent
-
-        local Lbl = Instance.new("TextLabel")
-        Lbl.Size = UDim2.new(1, -100, 1, 0)
-        Lbl.Position = UDim2.new(0, 4, 0, 0)
-        Lbl.BackgroundTransparency = 1
-        Lbl.Text = label
-        Lbl.TextColor3 = Color3.fromRGB(220, 220, 220)
-        Lbl.Font = Enum.Font.Gotham
-        Lbl.TextSize = 13
-        Lbl.TextXAlignment = Enum.TextXAlignment.Left
-        Lbl.Parent = Frame
-
-        local Btn = Instance.new("TextButton")
-        Btn.Size = UDim2.new(0, 90, 0, 22)
-        Btn.Position = UDim2.new(1, -94, 0, 3)
-        Btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-        Btn.Text = tostring(configTable[key]):gsub("Enum.KeyCode.", "")
-        Btn.TextColor3 = Color3.fromRGB(155, 89, 182)
-        Btn.Font = Enum.Font.GothamBold
-        Btn.TextSize = 11
-        Btn.Parent = Frame
-
-        local C = Instance.new("UICorner")
-        C.CornerRadius = UDim.new(0, 4)
-        C.Parent = Btn
-
-        local listening = false
-        Btn.MouseButton1Click:Connect(function()
-            listening = true
-            Btn.Text = "..."
-            Btn.TextColor3 = Color3.fromRGB(255, 200, 50)
-        end)
-
-        UserInputService.InputBegan:Connect(function(input, gpe)
-            if listening and not gpe then
-                configTable[key] = input.KeyCode
-                Btn.Text = tostring(input.KeyCode):gsub("Enum.KeyCode.", "")
-                Btn.TextColor3 = Color3.fromRGB(155, 89, 182)
-                listening = false
-            end
-        end)
-    end
-
-    -- BUILD TABS
-    local espPage = createTab("ESP")
-    addToggle(espPage, "ESP Master", Config.ESP, "Enabled")
-    addToggle(espPage, "Box ESP", Config.ESP.Box, "Enabled")
-    addToggle(espPage, "Name Tags", Config.ESP.Name, "Enabled")
-    addToggle(espPage, "Health Bars", Config.ESP.Health, "Enabled")
-    addToggle(espPage, "Distance", Config.ESP.Distance, "Enabled")
-    addSlider(espPage, "Max Range", Config.ESP.Distance, "MaxRange", 50, 1000)
-    addKeybind(espPage, "Toggle Key", Config.ESP, "Keybind")
-
-    local aimPage = createTab("Aimbot")
-    addToggle(aimPage, "Aimbot Master", Config.Aimbot, "Enabled")
-    addSlider(aimPage, "FOV Circle", Config.Aimbot, "FOV", 10, 500)
-    addSlider(aimPage, "Smoothness", Config.Aimbot, "Smoothness", 1, 100)
-    addToggle(aimPage, "Team Check", Config.Aimbot, "TeamCheck")
-    addKeybind(aimPage, "Aim Key", Config.Aimbot, "Keybind")
-
-    local absPage = createTab("Absurd")
-    addToggle(absPage, "Rainbow Body", Config.Absurd, "RainbowBody")
-    addToggle(absPage, "Rainbow Weapon", Config.Absurd, "RainbowWeapon")
-    addToggle(absPage, "One Tap (Local)", Config.Absurd, "OneTap")
-    addToggle(absPage, "Big Heads", Config.Absurd, "BigHeads")
-    addSlider(absPage, "Head Scale", Config.Absurd, "HeadScale", 1, 10)
-    addToggle(absPage, "Super Speed", Config.Absurd, "SuperSpeed")
-    addSlider(absPage, "Speed Value", Config.Absurd, "SpeedValue", 16, 200)
-    addToggle(absPage, "Super Jump", Config.Absurd, "SuperJump")
-    addSlider(absPage, "Jump Power", Config.Absurd, "JumpPower", 50, 300)
-    addToggle(absPage, "3rd Person Force", Config.Absurd, "ThirdPerson")
-    addToggle(absPage, "Mevlana Spin", Config.Absurd, "Mevlana")
-    addSlider(absPage, "Spin Speed", Config.Absurd, "MevvlanaSpeed", 1, 30)
-
-    local setPage = createTab("Settings")
-    addKeybind(setPage, "Menu Toggle", Config.Settings, "MenuToggle")
-
-    -- Toggle menu visibility
-    UserInputService.InputBegan:Connect(function(input, gpe)
+    UIS.InputBegan:Connect(function(i, gpe)
         if gpe then return end
-        if input.KeyCode == Config.Settings.MenuToggle then
-            Main.Visible = not Main.Visible
+        if i.KeyCode == CFG.MenuKey then
+            main.Visible = not main.Visible
         end
     end)
 
-    -- Activate first tab
-    Tabs[1].Button.MouseButton1Click:Fire()
-
-    return ScreenGui
+    return sg
 end
 
 -- ═══════════════════════════════════════
--- ESP RENDER LOOP
+-- AIMBOT (E Tuşu)
 -- ═══════════════════════════════════════
-local espObjects = {}
-
-local function updateESP()
-    -- Cleanup dead objects
-    for player, objs in pairs(espObjects) do
-        if not Players:FindFirstChild(player.Name) then
-            for _, obj in pairs(objs) do pcall(function() obj:Remove() end) end
-            espObjects[player] = nil
-        end
-    end
-
-    if not Config.ESP.Enabled then
-        for _, objs in pairs(espObjects) do
-            for _, obj in pairs(objs) do pcall(function() obj.Visible = false end) end
-        end
-        return
-    end
-
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
-            local char = player.Character
-            local hrp = char and char:FindFirstChild("HumanoidRootPart")
-            local hum = char and char:FindFirstChildOfClass("Humanoid")
-
-            if hrp and hum and hum.Health > 0 then
-                local dist = (hrp.Position - Camera.CFrame.Position).Magnitude
-                if dist <= Config.ESP.Distance.MaxRange then
-                    if not espObjects[player] then espObjects[player] = {} end
-                    local objs = espObjects[player]
-
-                    -- Box
-                    if Config.ESP.Box.Enabled then
-                        if not objs.Box then
-                            objs.Box = Drawing.new("Square")
-                        end
-                        local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
-                        objs.Box.Visible = onScreen
-                        if onScreen then
-                            local size = 300 / dist
-                            objs.Box.Size = Vector2.new(size * 1.5, size * 2)
-                            objs.Box.Position = Vector2.new(screenPos.X - objs.Box.Size.X/2, screenPos.Y - objs.Box.Size.Y/2)
-                            objs.Box.Color = Config.ESP.Box.Color
-                            objs.Box.Thickness = Config.ESP.Box.Thickness
-                        end
-                    elseif objs.Box then objs.Box.Visible = false end
-
-                    -- Name
-                    if Config.ESP.Name.Enabled then
-                        if not objs.Name then
-                            objs.Name = Drawing.new("Text")
-                            objs.Name.Center = true
-                            objs.Name.Outline = true
-                        end
-                        local head = char:FindFirstChild("Head")
-                        if head then
-                            local sp, os = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 1.5, 0))
-                            objs.Name.Visible = os
-                            if os then
-                                objs.Name.Position = Vector2.new(sp.X, sp.Y)
-                                objs.Name.Text = string.format("%s [%d]", player.Name, math.floor(dist))
-                                objs.Name.Color = Config.ESP.Name.Color
-                                objs.Name.Size = Config.ESP.Name.Size
-                            end
-                        end
-                    elseif objs.Name then objs.Name.Visible = false end
-                else
-                    if espObjects[player] then
-                        for _, obj in pairs(espObjects[player]) do pcall(function() obj.Visible = false end) end
-                    end
+local function getTarget()
+    local best, dist = nil, CFG.AimFOV
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LP then
+            if CFG.AimTeamCheck and p.Team == LP.Team then continue end
+            local c = p.Character
+            local h = c and c:FindFirstChild("Head")
+            local hum = c and c:FindFirstChildOfClass("Humanoid")
+            if h and hum and hum.Health > 0 then
+                local sp, os = Cam:WorldToViewportPoint(h.Position)
+                if os then
+                    local d = (Vector2.new(sp.X, sp.Y) - UIS:GetMouseLocation()).Magnitude
+                    if d < dist then dist, best = d, h end
                 end
             end
         end
     end
+    return best
 end
 
 -- ═══════════════════════════════════════
--- AIMBOT LOOP
+-- MAIN LOOP
 -- ═══════════════════════════════════════
-local function getClosestTarget()
-    local closest, minDist = nil, Config.Aimbot.FOV
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
-            if Config.Aimbot.TeamCheck and player.Team == LocalPlayer.Team then continue end
-            local char = player.Character
-            local part = char and char:FindFirstChild(Config.Aimbot.TargetPart)
-            local hum = char and char:FindFirstChildOfClass("Humanoid")
-            if part and hum and hum.Health > 0 then
-                local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
-                if onScreen then
-                    local mousePos = UserInputService:GetMouseLocation()
-                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
-                    if dist < minDist then
-                        minDist = dist
-                        closest = part
-                    end
-                end
-            end
-        end
-    end
-    return closest
-end
-
-local function updateAimbot()
-    if not Config.Aimbot.Enabled then return end
-    local held = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
-        or UserInputService:IsKeyDown(Config.Aimbot.Keybind)
-    if not held then return end
-
-    local target = getClosestTarget()
-    if target then
-        local smooth = math.clamp(Config.Aimbot.Smoothness / 100, 0.01, 1)
-        local goal = CFrame.lookAt(Camera.CFrame.Position, target.Position)
-        Camera.CFrame = Camera.CFrame:Lerp(goal, smooth)
-    end
-end
-
--- ═══════════════════════════════════════
--- ABSURD FEATURES LOOP
--- ═══════════════════════════════════════
-local rainbowHue = 0
-local mevlanaAngle = 0
-
-local function updateAbsurd(dt)
-    local char = LocalPlayer.Character
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-    local hum = char and char:FindFirstChildOfClass("Humanoid")
-    if not (char and hrp and hum) then return end
-
-    -- Rainbow Body
-    if Config.Absurd.RainbowBody then
-        rainbowHue = (rainbowHue + dt * 0.5) % 1
-        for _, part in ipairs(char:GetDescendants()) do
-            if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart"
-               and not part:FindFirstAncestorWhichIsA("Tool") then
-                part.Color = Color3.fromHSV(rainbowHue, 1, 1)
-            end
-        end
-    end
-
-    -- Rainbow Weapon
-    if Config.Absurd.RainbowWeapon then
-        for _, tool in ipairs(char:GetChildren()) do
-            if tool:IsA("Tool") then
-                for _, part in ipairs(tool:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        part.Color = Color3.fromHSV(rainbowHue, 1, 1)
-                    end
-                end
-            end
-        end
-    end
-
-    -- Big Heads
-    if Config.Absurd.BigHeads then
-        local head = char:FindFirstChild("Head")
-        if head and head:IsA("MeshPart") then
-            head.Mesh.Scale = Vector3.new(Config.Absurd.HeadScale, Config.Absurd.HeadScale, Config.Absurd.HeadScale)
-        end
-    end
-
-    -- Super Speed / Jump (client prediction only)
-    if Config.Absurd.SuperSpeed then
-        hum.WalkSpeed = Config.Absurd.SpeedValue
-    end
-    if Config.Absurd.SuperJump then
-        hum.JumpPower = Config.Absurd.JumpPower
-    end
-
-    -- 3rd Person
-    if Config.Absurd.ThirdPerson then
-        LocalPlayer.CameraMode = Enum.CameraMode.Classic
-        LocalPlayer.CameraMinZoomDistance = 8
-    end
-
-    -- Mevlana Spin (local visual only)
-    if Config.Absurd.Mevlana and hrp then
-        mevlanaAngle = mevlanaAngle + dt * Config.Absurd.MevlanaSpeed
-        hrp.CFrame = hrp.CFrame * CFrame.Angles(0, mevlanaAngle * dt, 0)
-    end
-end
-
--- ═══════════════════════════════════════
--- MAIN LOOPS
--- ═══════════════════════════════════════
-createUI()
+buildUI()
+local hue = 0
 
 RunService.RenderStepped:Connect(function(dt)
-    updateESP()
-    updateAimbot()
-    updateAbsurd(dt)
+    -- Aimbot
+    if UIS:IsKeyDown(CFG.AimKey) then
+        local t = getTarget()
+        if t then
+            local goal = CFrame.lookAt(Cam.CFrame.Position, t.Position)
+            Cam.CFrame = Cam.CFrame:Lerp(goal, CFG.AimSmooth)
+        end
+    end
+
+    -- ESP (basit box)
+    if CFG.ESP then
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LP then
+                local c = p.Character
+                local hrp = c and c:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    local sp, os = Cam:WorldToViewportPoint(hrp.Position)
+                    if os then
+                        -- Drawing API kullanılmadı, minimal tutmak için
+                        -- İstersen ESP'yi Drawing.new ile genişletebilirsin
+                    end
+                end
+            end
+        end
+    end
+
+    -- Absurd
+    local char = LP.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if char and hum then
+        if CFG.Rainbow then
+            hue = (hue + dt * 0.5) % 1
+            for _, v in ipairs(char:GetDescendants()) do
+                if v:IsA("BasePart") and v.Name ~= "HumanoidRootPart" then
+                    v.Color = Color3.fromHSV(hue, 1, 1)
+                end
+            end
+        end
+        if CFG.BigHead then
+            local head = char:FindFirstChild("Head")
+            if head and head:IsA("MeshPart") then
+                head.Mesh.Scale = Vector3.new(3,3,3)
+            end
+        end
+        if CFG.Speed then hum.WalkSpeed = CFG.SpeedVal end
+        if CFG.Jump then hum.JumpPower = CFG.JumpVal end
+    end
 end)
 
--- Cleanup on removal
-LocalPlayer.CharacterRemoving:Connect(function()
-    for _, objs in pairs(espObjects) do
-        for _, obj in pairs(objs) do pcall(function() obj:Remove() end) end
-    end
-    espObjects = {}
-end)
+print("[4080] Raffle Hub yüklendi. Menü: RightShift | Aimbot: E")
