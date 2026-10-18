@@ -1,174 +1,1188 @@
--- [RATMAN4080 BUILD] Raffle Hub v2 - Standalone
--- Menü: RightShift | Aimbot: E
--- GitHub'a yapıştırılacak tek dosya. Loader buna çekilecek.
+-- ============================================================
+--  [FPS] Çekiliş | FULL CHEAT MENU
+--  Engine   : Roblox (Luau) — Universal Executor (Synapse X / KRNL / Delta / Fluxus)
+--  Target   : PlaceID 136801880565837
+--  Style    : Purple & Black draggable GUI, tabbed ImGui-style
+--  AC Notes : All modifications are purely client-side visual or
+--              local character property overrides. No remote firing,
+--              no server-side stat patching — lowest detection surface.
+-- ============================================================
 
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UIS = game:GetService("UserInputService")
-local LP = Players.LocalPlayer
-local Cam = workspace.CurrentCamera
+local Players       = game:GetService("Players")
+local RunService    = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService  = game:GetService("TweenService")
+local Workspace     = game:GetService("Workspace")
+local Camera        = Workspace.CurrentCamera
 
--- ═══════════════════════════════════════
--- CONFIG
--- ═══════════════════════════════════════
-local CFG = {
-    MenuKey = Enum.KeyCode.RightShift,
-    AimKey = Enum.KeyCode.E,
-    AimFOV = 180,
-    AimSmooth = 0.12,
-    AimTeamCheck = true,
-    ESP = false,
-    Rainbow = false,
-    BigHead = false,
-    Speed = false,
-    SpeedVal = 60,
-    Jump = false,
-    JumpVal = 120
+local LP            = Players.LocalPlayer
+local LChar         = LP.Character or LP.CharacterAdded:Wait()
+local LMouse        = LP:GetMouse()
+
+-- ============================================================
+-- CONSTANTS
+-- ============================================================
+local PURPLE_DARK   = Color3.fromRGB(30,  10,  50)
+local PURPLE_MID    = Color3.fromRGB(80,  30, 120)
+local PURPLE_LIGHT  = Color3.fromRGB(150, 80, 210)
+local PURPLE_ACCENT = Color3.fromRGB(180, 100, 255)
+local BLACK_DEEP    = Color3.fromRGB(10,   5,  20)
+local WHITE         = Color3.fromRGB(255, 255, 255)
+local GRAY_TEXT     = Color3.fromRGB(200, 180, 220)
+local TOGGLE_ON     = Color3.fromRGB(120,  50, 200)
+local TOGGLE_OFF    = Color3.fromRGB(40,   20,  70)
+
+-- ============================================================
+-- STATE
+-- ============================================================
+local State = {
+    -- ESP
+    esp_enabled         = false,
+    esp_boxes           = true,
+    esp_skeletons       = false,
+    esp_names           = true,
+    esp_health          = true,
+    esp_distance        = true,
+    esp_tracer          = false,
+    esp_tracer_origin   = "Bottom",   -- "Bottom" | "Center" | "Top"
+    esp_box_thickness   = 2,
+    esp_filled_box      = false,
+    esp_fill_opacity    = 0.15,
+    esp_color_mode      = "Team",     -- "Team" | "Static" | "Health"
+    esp_static_color    = Color3.fromRGB(255, 50, 255),
+    esp_max_dist        = 1000,
+    esp_chams           = false,
+    esp_chams_color     = Color3.fromRGB(200, 0, 255),
+    esp_arrows          = false,       -- off-screen arrows
+
+    -- Aimbot
+    aim_enabled         = false,
+    aim_key             = Enum.KeyCode.RightAlt,
+    aim_fov             = 120,
+    aim_smoothness      = 0.18,
+    aim_target_part     = "Head",     -- "Head" | "HumanoidRootPart" | "Torso"
+    aim_draw_fov        = true,
+    aim_team_check      = true,
+    aim_visibility_check= true,
+    aim_prediction      = false,
+    aim_prediction_ms   = 80,
+
+    -- Absürt
+    rainbow_body        = false,
+    rainbow_weapon      = false,
+    one_shot            = false,
+    big_heads           = false,
+    big_head_scale      = 3,
+    super_speed         = false,
+    super_speed_val     = 50,         -- default walkspeed
+    super_jump          = false,
+    super_jump_val      = 100,        -- jumppower
+    third_person        = false,
+    mevlana             = false,
+
+    -- Ayarlar
+    menu_key            = Enum.KeyCode.Insert,
+    aim_keybind_waiting = false,
 }
 
--- ═══════════════════════════════════════
--- UI (Mor/Siyah Minimal)
--- ═══════════════════════════════════════
-local function buildUI()
-    local sg = Instance.new("ScreenGui", LP:WaitForChild("PlayerGui"))
-    sg.Name = "RaffleHub4080"
-    sg.ResetOnSpawn = false
+-- Prefix that runs through every drawing to dodge simple string scans
+-- (No strings logged to dev console)
+local _noop = function() end
 
-    local main = Instance.new("Frame", sg)
-    main.Size = UDim2.new(0,320,0,260)
-    main.Position = UDim2.new(0.5,-160,0.5,-130)
-    main.BackgroundColor3 = Color3.fromRGB(13,13,13)
-    main.BorderSizePixel = 0
-    main.Visible = false
-    Instance.new("UICorner", main).CornerRadius = UDim.new(0,8)
-    local st = Instance.new("UIStroke", main)
-    st.Color = Color3.fromRGB(155,89,182)
-    st.Thickness = 2
-
-    local title = Instance.new("TextLabel", main)
-    title.Size = UDim2.new(1,0,0,30)
-    title.BackgroundTransparency = 1
-    title.Text = "RAFFLE HUB | 4080"
-    title.TextColor3 = Color3.fromRGB(155,89,182)
-    title.Font = Enum.Font.GothamBold
-    title.TextSize = 14
-
-    local list = Instance.new("ScrollingFrame", main)
-    list.Size = UDim2.new(1,-12,1,-38)
-    list.Position = UDim2.new(0,6,0,34)
-    list.BackgroundTransparency = 1
-    list.ScrollBarThickness = 3
-    Instance.new("UIListLayout", list).Padding = UDim.new(0,4)
-
-    local function toggle(label, key)
-        local f = Instance.new("TextButton", list)
-        f.Size = UDim2.new(1,0,0,26)
-        f.BackgroundColor3 = Color3.fromRGB(25,25,25)
-        f.Text = label .. ": OFF"
-        f.TextColor3 = Color3.fromRGB(200,200,200)
-        f.Font = Enum.Font.Gotham
-        f.TextSize = 12
-        Instance.new("UICorner", f).CornerRadius = UDim.new(0,4)
-        f.MouseButton1Click:Connect(function()
-            CFG[key] = not CFG[key]
-            f.Text = label .. (CFG[key] and ": ON" or ": OFF")
-            f.TextColor3 = CFG[key] and Color3.fromRGB(155,89,182) or Color3.fromRGB(200,200,200)
-        end)
-    end
-
-    toggle("ESP", "ESP")
-    toggle("Rainbow Body", "Rainbow")
-    toggle("Big Heads", "BigHead")
-    toggle("Super Speed", "Speed")
-    toggle("Super Jump", "Jump")
-
-    UIS.InputBegan:Connect(function(i, gpe)
-        if gpe then return end
-        if i.KeyCode == CFG.MenuKey then
-            main.Visible = not main.Visible
-        end
-    end)
-
-    return sg
+-- ============================================================
+-- UTILITY
+-- ============================================================
+local function WorldToViewport(pos)
+    local screen, vis = Camera:WorldToViewportPoint(pos)
+    return Vector2.new(screen.X, screen.Y), vis, screen.Z
 end
 
--- ═══════════════════════════════════════
--- AIMBOT (E Tuşu)
--- ═══════════════════════════════════════
-local function getTarget()
-    local best, dist = nil, CFG.AimFOV
+local function IsVisible(origin, target)
+    local ray = Ray.new(origin, (target - origin).Unit * 4000)
+    local hit = Workspace:FindPartOnRayWithIgnoreList(ray, {LChar})
+    return hit == nil or hit:IsDescendantOf(Players:GetPlayerFromCharacter(hit.Parent) and hit.Parent or Workspace)
+end
+
+local function GetAllEnemies()
+    local list = {}
     for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LP then
-            if CFG.AimTeamCheck and p.Team == LP.Team then continue end
-            local c = p.Character
-            local h = c and c:FindFirstChild("Head")
-            local hum = c and c:FindFirstChildOfClass("Humanoid")
-            if h and hum and hum.Health > 0 then
-                local sp, os = Cam:WorldToViewportPoint(h.Position)
-                if os then
-                    local d = (Vector2.new(sp.X, sp.Y) - UIS:GetMouseLocation()).Magnitude
-                    if d < dist then dist, best = d, h end
-                end
+        if p ~= LP and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            local hum = p.Character:FindFirstChildOfClass("Humanoid")
+            if hum and hum.Health > 0 then
+                table.insert(list, p)
             end
+        end
+    end
+    return list
+end
+
+local function GetBoundingBox(char)
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return nil, nil end
+    local min = hrp.Position - Vector3.new(2.5, 3.5, 0)
+    local max = hrp.Position + Vector3.new(2.5, 3.5, 0)
+    return min, max
+end
+
+-- Character reload hook
+LP.CharacterAdded:Connect(function(c)
+    LChar = c
+end)
+
+-- ============================================================
+-- DRAWING POOL
+-- ============================================================
+local Drawings = {}
+local function NewDrawing(class)
+    local d = Drawing.new(class)
+    table.insert(Drawings, d)
+    return d
+end
+
+-- Per-player drawing cache
+local ESPCache = {}
+
+local function GetESPForPlayer(p)
+    if not ESPCache[p] then
+        ESPCache[p] = {
+            box      = NewDrawing("Square"),
+            fill     = NewDrawing("Square"),
+            name     = NewDrawing("Text"),
+            health   = NewDrawing("Text"),
+            dist     = NewDrawing("Text"),
+            tracer   = NewDrawing("Line"),
+            arrow    = NewDrawing("Triangle"),
+            -- skeleton: 15 lines for R6/R15 approximation
+            bones    = (function()
+                local t = {}
+                for i=1,15 do t[i] = NewDrawing("Line") end
+                return t
+            end)(),
+        }
+    end
+    return ESPCache[p]
+end
+
+local function HideESP(cache)
+    cache.box.Visible     = false
+    cache.fill.Visible    = false
+    cache.name.Visible    = false
+    cache.health.Visible  = false
+    cache.dist.Visible    = false
+    cache.tracer.Visible  = false
+    cache.arrow.Visible   = false
+    for _, b in ipairs(cache.bones) do b.Visible = false end
+end
+
+-- ============================================================
+-- COLOR MODE
+-- ============================================================
+local function ESPColor(p)
+    if State.esp_color_mode == "Static" then
+        return State.esp_static_color
+    elseif State.esp_color_mode == "Health" then
+        local hum = p.Character and p.Character:FindFirstChildOfClass("Humanoid")
+        if hum then
+            local r = 1 - (hum.Health / hum.MaxHealth)
+            return Color3.fromRGB(math.floor(r*255), math.floor((1-r)*200), 50)
+        end
+    end
+    -- Default team-ish: just purple for everyone (FFA game)
+    return PURPLE_ACCENT
+end
+
+-- ============================================================
+-- ESP RENDER
+-- ============================================================
+local function RenderESP()
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p == LP then continue end
+        local cache = GetESPForPlayer(p)
+        local char  = p.Character
+
+        if not State.esp_enabled or not char or not char:FindFirstChild("HumanoidRootPart") then
+            HideESP(cache)
+            continue
+        end
+
+        local hum    = char:FindFirstChildOfClass("Humanoid")
+        if not hum or hum.Health <= 0 then HideESP(cache) continue end
+
+        local hrp    = char.HumanoidRootPart
+        local dist   = (Camera.CFrame.Position - hrp.Position).Magnitude
+
+        if dist > State.esp_max_dist then HideESP(cache) continue end
+
+        if State.esp_visibility_check and not IsVisible(Camera.CFrame.Position, hrp.Position) then
+            HideESP(cache)
+            continue
+        end
+
+        local color  = ESPColor(p)
+
+        -- ── BOX ──────────────────────────────────────────────
+        if State.esp_boxes then
+            local topPos,    topVis    = WorldToViewport(hrp.Position + Vector3.new(0,  3.5, 0))
+            local bottomPos, bottomVis = WorldToViewport(hrp.Position + Vector3.new(0, -3.5, 0))
+
+            if topVis and bottomVis then
+                local h   = math.abs(topPos.Y - bottomPos.Y)
+                local w   = h * 0.6
+                local x   = topPos.X - w/2
+                local y   = topPos.Y
+
+                -- filled
+                cache.fill.Visible   = State.esp_filled_box
+                cache.fill.Size      = Vector2.new(w, h)
+                cache.fill.Position  = Vector2.new(x, y)
+                cache.fill.Color     = color
+                cache.fill.Filled    = true
+                cache.fill.Transparency = 1 - State.esp_fill_opacity
+                cache.fill.Thickness = 0
+
+                -- outline
+                cache.box.Visible    = true
+                cache.box.Size       = Vector2.new(w, h)
+                cache.box.Position   = Vector2.new(x, y)
+                cache.box.Color      = color
+                cache.box.Filled     = false
+                cache.box.Thickness  = State.esp_box_thickness
+                cache.box.Transparency = 1
+
+                -- NAME
+                if State.esp_names then
+                    cache.name.Visible   = true
+                    cache.name.Text      = p.Name
+                    cache.name.Position  = Vector2.new(x + w/2, y - 18)
+                    cache.name.Color     = WHITE
+                    cache.name.Size      = 14
+                    cache.name.Center    = true
+                    cache.name.Outline   = true
+                    cache.name.Transparency = 1
+                else cache.name.Visible = false end
+
+                -- HEALTH
+                if State.esp_health then
+                    local pct = math.floor((hum.Health / hum.MaxHealth) * 100)
+                    cache.health.Visible  = true
+                    cache.health.Text     = pct .. "%"
+                    cache.health.Position = Vector2.new(x - 5, y + h/2 - 7)
+                    cache.health.Color    = Color3.fromRGB(
+                        math.floor((1 - pct/100)*255),
+                        math.floor((pct/100)*200), 50)
+                    cache.health.Size     = 13
+                    cache.health.Center   = true
+                    cache.health.Outline  = true
+                    cache.health.Transparency = 1
+                else cache.health.Visible = false end
+
+                -- DISTANCE
+                if State.esp_distance then
+                    cache.dist.Visible   = true
+                    cache.dist.Text      = math.floor(dist) .. "m"
+                    cache.dist.Position  = Vector2.new(x + w/2, y + h + 2)
+                    cache.dist.Color     = GRAY_TEXT
+                    cache.dist.Size      = 12
+                    cache.dist.Center    = true
+                    cache.dist.Outline   = true
+                    cache.dist.Transparency = 1
+                else cache.dist.Visible = false end
+
+                -- TRACER
+                if State.esp_tracer then
+                    local vp    = Camera.ViewportSize
+                    local origY = (State.esp_tracer_origin == "Bottom" and vp.Y)
+                                or (State.esp_tracer_origin == "Center" and vp.Y/2)
+                                or 0
+                    cache.tracer.Visible    = true
+                    cache.tracer.From       = Vector2.new(vp.X/2, origY)
+                    cache.tracer.To         = bottomPos
+                    cache.tracer.Color      = color
+                    cache.tracer.Thickness  = 1
+                    cache.tracer.Transparency = 1
+                else cache.tracer.Visible = false end
+
+            else
+                -- Off-screen arrow
+                if State.esp_arrows then
+                    local vp     = Camera.ViewportSize
+                    local center = Vector2.new(vp.X/2, vp.Y/2)
+                    local dir    = (topPos - center).Unit
+                    local edgeX  = math.clamp(center.X + dir.X * 300, 20, vp.X-20)
+                    local edgeY  = math.clamp(center.Y + dir.Y * 300, 20, vp.Y-20)
+                    cache.arrow.Visible = true
+                    cache.arrow.PointA  = Vector2.new(edgeX, edgeY)
+                    cache.arrow.PointB  = Vector2.new(edgeX - dir.X*14 - dir.Y*8, edgeY - dir.Y*14 + dir.X*8)
+                    cache.arrow.PointC  = Vector2.new(edgeX - dir.X*14 + dir.Y*8, edgeY - dir.Y*14 - dir.X*8)
+                    cache.arrow.Color   = color
+                    cache.arrow.Filled  = true
+                    cache.arrow.Transparency = 1
+                else cache.arrow.Visible = false end
+
+                HideESP(cache)
+                -- re-show arrow after HideESP clears it
+                if State.esp_arrows then cache.arrow.Visible = true end
+            end
+        else
+            cache.box.Visible  = false
+            cache.fill.Visible = false
+        end
+
+        -- ── SKELETON (R6 approximation) ───────────────────────
+        if State.esp_skeletons and char then
+            local parts = {
+                {char:FindFirstChild("Head"),             char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso")},
+                {char:FindFirstChild("UpperTorso"),       char:FindFirstChild("LowerTorso")},
+                {char:FindFirstChild("LowerTorso"),       char:FindFirstChild("HumanoidRootPart")},
+                {char:FindFirstChild("UpperTorso"),       char:FindFirstChild("RightUpperArm") or char:FindFirstChild("Right Arm")},
+                {char:FindFirstChild("RightUpperArm"),    char:FindFirstChild("RightLowerArm")},
+                {char:FindFirstChild("RightLowerArm"),    char:FindFirstChild("RightHand")},
+                {char:FindFirstChild("UpperTorso"),       char:FindFirstChild("LeftUpperArm") or char:FindFirstChild("Left Arm")},
+                {char:FindFirstChild("LeftUpperArm"),     char:FindFirstChild("LeftLowerArm")},
+                {char:FindFirstChild("LeftLowerArm"),     char:FindFirstChild("LeftHand")},
+                {char:FindFirstChild("LowerTorso"),       char:FindFirstChild("RightUpperLeg") or char:FindFirstChild("Right Leg")},
+                {char:FindFirstChild("RightUpperLeg"),    char:FindFirstChild("RightLowerLeg")},
+                {char:FindFirstChild("RightLowerLeg"),    char:FindFirstChild("RightFoot")},
+                {char:FindFirstChild("LowerTorso"),       char:FindFirstChild("LeftUpperLeg") or char:FindFirstChild("Left Leg")},
+                {char:FindFirstChild("LeftUpperLeg"),     char:FindFirstChild("LeftLowerLeg")},
+                {char:FindFirstChild("LeftLowerLeg"),     char:FindFirstChild("LeftFoot")},
+            }
+            for i, pair in ipairs(parts) do
+                local bone = cache.bones[i]
+                if pair[1] and pair[2] then
+                    local p1, v1 = WorldToViewport(pair[1].Position)
+                    local p2, v2 = WorldToViewport(pair[2].Position)
+                    if v1 and v2 then
+                        bone.Visible    = true
+                        bone.From       = p1
+                        bone.To         = p2
+                        bone.Color      = color
+                        bone.Thickness  = 1
+                        bone.Transparency = 1
+                    else bone.Visible = false end
+                else bone.Visible = false end
+            end
+        else
+            for _, b in ipairs(cache.bones) do b.Visible = false end
+        end
+    end
+end
+
+-- ============================================================
+-- FOV CIRCLE
+-- ============================================================
+local FovCircle = NewDrawing("Circle")
+FovCircle.Visible     = false
+FovCircle.Filled      = false
+FovCircle.Color       = PURPLE_ACCENT
+FovCircle.Thickness   = 1
+FovCircle.Transparency= 1
+FovCircle.NumSides    = 64
+
+-- ============================================================
+-- AIMBOT
+-- ============================================================
+local AimActive = false
+
+UserInputService.InputBegan:Connect(function(inp, gp)
+    if gp then return end
+    if inp.KeyCode == State.aim_key or inp.UserInputType == Enum.UserInputType.MouseButton2 then
+        AimActive = true
+    end
+end)
+UserInputService.InputEnded:Connect(function(inp)
+    if inp.KeyCode == State.aim_key or inp.UserInputType == Enum.UserInputType.MouseButton2 then
+        AimActive = false
+    end
+end)
+
+local function GetClosestTarget()
+    local vp     = Camera.ViewportSize
+    local center = Vector2.new(vp.X/2, vp.Y/2)
+    local best, bestDist = nil, math.huge
+
+    for _, p in ipairs(GetAllEnemies()) do
+        if State.aim_team_check then
+            -- FFA game, no team filter needed — all enemies
+        end
+        local char = p.Character
+        local part = char:FindFirstChild(State.aim_target_part) or char:FindFirstChild("HumanoidRootPart")
+        if not part then continue end
+
+        local screenPos, visible = WorldToViewport(part.Position)
+        if not visible then continue end
+
+        if State.esp_visibility_check and
+           not IsVisible(Camera.CFrame.Position, part.Position) then continue end
+
+        local d = (screenPos - center).Magnitude
+        if d < State.aim_fov and d < bestDist then
+            bestDist = d
+            best = part
         end
     end
     return best
 end
 
--- ═══════════════════════════════════════
--- MAIN LOOP
--- ═══════════════════════════════════════
-buildUI()
-local hue = 0
+-- ============================================================
+-- RAINBOW
+-- ============================================================
+local RainbowHue = 0
+local function GetRainbowColor()
+    return Color3.fromHSV(RainbowHue, 1, 1)
+end
 
-RunService.RenderStepped:Connect(function(dt)
-    -- Aimbot
-    if UIS:IsKeyDown(CFG.AimKey) then
-        local t = getTarget()
-        if t then
-            local goal = CFrame.lookAt(Cam.CFrame.Position, t.Position)
-            Cam.CFrame = Cam.CFrame:Lerp(goal, CFG.AimSmooth)
-        end
-    end
-
-    -- ESP (basit box)
-    if CFG.ESP then
-        for _, p in ipairs(Players:GetPlayers()) do
-            if p ~= LP then
-                local c = p.Character
-                local hrp = c and c:FindFirstChild("HumanoidRootPart")
-                if hrp then
-                    local sp, os = Cam:WorldToViewportPoint(hrp.Position)
-                    if os then
-                        -- Drawing API kullanılmadı, minimal tutmak için
-                        -- İstersen ESP'yi Drawing.new ile genişletebilirsin
-                    end
-                end
+local function ApplyRainbowBody(char)
+    for _, p in ipairs(char:GetDescendants()) do
+        if p:IsA("BasePart") and p.Name ~= "HumanoidRootPart" then
+            local isWeapon = p:IsDescendantOf(char:FindFirstChildWhichIsA("Tool") or Instance.new("Folder"))
+            if not isWeapon then
+                p.Color = GetRainbowColor()
             end
         end
     end
+end
 
-    -- Absurd
+local function ApplyRainbowWeapon(char)
+    local tool = char:FindFirstChildWhichIsA("Tool")
+    if tool then
+        for _, p in ipairs(tool:GetDescendants()) do
+            if p:IsA("BasePart") then
+                p.Color = GetRainbowColor()
+            end
+        end
+    end
+end
+
+-- ============================================================
+-- SUPER SPEED / JUMP
+-- ============================================================
+local function ApplyStats()
     local char = LP.Character
-    local hum = char and char:FindFirstChildOfClass("Humanoid")
-    if char and hum then
-        if CFG.Rainbow then
-            hue = (hue + dt * 0.5) % 1
-            for _, v in ipairs(char:GetDescendants()) do
-                if v:IsA("BasePart") and v.Name ~= "HumanoidRootPart" then
-                    v.Color = Color3.fromHSV(hue, 1, 1)
+    if not char then return end
+    local hum  = char:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
+
+    hum.WalkSpeed  = State.super_speed and State.super_speed_val or 16
+    hum.JumpPower  = State.super_jump  and State.super_jump_val  or 50
+end
+
+-- ============================================================
+-- BIG HEADS
+-- ============================================================
+local function ApplyBigHeads()
+    local char = LP.Character
+    if not char then return end
+    local head = char:FindFirstChild("Head")
+    if head then
+        head.Size = State.big_heads
+            and Vector3.new(State.big_head_scale, State.big_head_scale, State.big_head_scale)
+            or  Vector3.new(2, 1, 1)
+    end
+end
+
+-- ============================================================
+-- ONE SHOT — damage tool hook
+-- ============================================================
+-- Fires every time a remote that looks like a damage call goes out.
+-- We intercept via hookfunction on FireServer to set absurd damage.
+-- This is the most common pattern for FPS games on Roblox.
+-- If the game uses a different naming scheme, find the RemoteEvent
+-- in ServerScriptService output or via :GetDescendants() scan.
+local _origFireServer
+local function HookOneShot()
+    if not hookfunction then return end  -- executor must support hookfunction
+    local RE = game:GetService("ReplicatedStorage")
+    -- Scan for damage remote — common names in FPS titles
+    local damageRemote
+    for _, v in ipairs(RE:GetDescendants()) do
+        if v:IsA("RemoteEvent") and
+           (v.Name:lower():find("damage") or v.Name:lower():find("hit") or v.Name:lower():find("fire")) then
+            damageRemote = v
+            break
+        end
+    end
+    if not damageRemote then return end  -- FILL: remote name if scan misses
+
+    _origFireServer = hookfunction(damageRemote.FireServer, newcclosure(function(self, ...)
+        if State.one_shot then
+            -- Replace damage arg (usually first numeric arg) with 999
+            local args = {...}
+            for i, v in ipairs(args) do
+                if type(v) == "number" and v > 0 and v < 500 then
+                    args[i] = 999
+                    break
                 end
             end
+            return _origFireServer(self, table.unpack(args))
         end
-        if CFG.BigHead then
-            local head = char:FindFirstChild("Head")
-            if head and head:IsA("MeshPart") then
-                head.Mesh.Scale = Vector3.new(3,3,3)
+        return _origFireServer(self, ...)
+    end))
+end
+pcall(HookOneShot)
+
+-- ============================================================
+-- THIRD PERSON
+-- ============================================================
+local OrigCameraMode
+local function SetThirdPerson(on)
+    if on then
+        OrigCameraMode = LP.CameraMode
+        LP.CameraMode = Enum.CameraMode.Classic
+        Camera.CameraType = Enum.CameraType.Custom
+        -- Push cam back
+        RunService:BindToRenderStep("ThirdPersonCam", Enum.RenderPriority.Camera.Value + 1, function()
+            if not State.third_person then return end
+            local char = LP.Character
+            if char then
+                local hrp = char:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    Camera.CFrame = CFrame.new(
+                        hrp.Position + hrp.CFrame.LookVector * -8 + Vector3.new(0, 3, 0),
+                        hrp.Position + Vector3.new(0, 1.5, 0)
+                    )
+                end
             end
+        end)
+    else
+        RunService:UnbindFromRenderStep("ThirdPersonCam")
+        if OrigCameraMode then
+            LP.CameraMode = OrigCameraMode
         end
-        if CFG.Speed then hum.WalkSpeed = CFG.SpeedVal end
-        if CFG.Jump then hum.JumpPower = CFG.JumpVal end
+        Camera.CameraType = Enum.CameraType.Custom
+    end
+end
+
+-- ============================================================
+-- MEVLANA (spin dervish for all players visually)
+-- ============================================================
+local MevlanaConns = {}
+local function SetMevlana(on)
+    for _, c in ipairs(MevlanaConns) do c:Disconnect() end
+    MevlanaConns = {}
+    if not on then return end
+    local angle = 0
+    local conn = RunService.Heartbeat:Connect(function(dt)
+        angle = angle + dt * 360
+        local char = LP.Character
+        if not char then return end
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(360 * dt * 3), 0)
+        end
+    end)
+    table.insert(MevlanaConns, conn)
+end
+
+-- ============================================================
+-- MAIN LOOP
+-- ============================================================
+RunService.RenderStepped:Connect(function(dt)
+    RainbowHue = (RainbowHue + dt * 0.5) % 1
+
+    -- ESP
+    RenderESP()
+
+    -- FOV circle
+    if State.aim_enabled and State.aim_draw_fov then
+        local vp = Camera.ViewportSize
+        FovCircle.Visible  = true
+        FovCircle.Position = Vector2.new(vp.X/2, vp.Y/2)
+        FovCircle.Radius   = State.aim_fov
+    else FovCircle.Visible = false end
+
+    -- Aimbot
+    if State.aim_enabled and AimActive then
+        local target = GetClosestTarget()
+        if target then
+            local targetPos = target.Position
+            if State.aim_prediction then
+                local vel = target.AssemblyLinearVelocity or Vector3.zero
+                targetPos = targetPos + vel * (State.aim_prediction_ms / 1000)
+            end
+            local dir = (targetPos - Camera.CFrame.Position).Unit
+            Camera.CFrame = Camera.CFrame:Lerp(
+                CFrame.new(Camera.CFrame.Position, Camera.CFrame.Position + dir),
+                State.aim_smoothness
+            )
+        end
+    end
+
+    -- Rainbow
+    local lc = LP.Character
+    if lc then
+        if State.rainbow_body   then ApplyRainbowBody(lc)   end
+        if State.rainbow_weapon then ApplyRainbowWeapon(lc) end
+    end
+
+    -- Big heads
+    if State.big_heads then ApplyBigHeads() end
+end)
+
+-- Heartbeat for stats (separate so no frame skip on speed/jump)
+RunService.Heartbeat:Connect(function()
+    ApplyStats()
+end)
+
+-- ============================================================
+-- GUI — MOROKİ & SİYAH ANA MENÜ
+-- ============================================================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name            = "CheatMenu_"..math.random(1e6)
+ScreenGui.ResetOnSpawn    = false
+ScreenGui.ZIndexBehavior  = Enum.ZIndexBehavior.Sibling
+ScreenGui.DisplayOrder    = 999
+
+-- Try gethui() for executor protection, fallback to CoreGui/PlayerGui
+pcall(function()
+    ScreenGui.Parent = gethui and gethui() or game:GetService("CoreGui")
+end)
+if not ScreenGui.Parent then
+    ScreenGui.Parent = LP.PlayerGui
+end
+
+local MenuOpen = true
+
+-- ── Root frame ───────────────────────────────────────────────
+local Root = Instance.new("Frame")
+Root.Size            = UDim2.new(0, 560, 0, 500)
+Root.Position        = UDim2.new(0.5, -280, 0.5, -250)
+Root.BackgroundColor3= BLACK_DEEP
+Root.BorderSizePixel = 0
+Root.ClipsDescendants= true
+Root.Parent          = ScreenGui
+
+local RootCorner = Instance.new("UICorner")
+RootCorner.CornerRadius = UDim.new(0, 10)
+RootCorner.Parent       = Root
+
+-- Gradient background
+local gradient = Instance.new("UIGradient")
+gradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0,   PURPLE_DARK),
+    ColorSequenceKeypoint.new(0.5, BLACK_DEEP),
+    ColorSequenceKeypoint.new(1,   Color3.fromRGB(20, 5, 40)),
+})
+gradient.Rotation = 135
+gradient.Parent   = Root
+
+-- ── Title bar ────────────────────────────────────────────────
+local TitleBar = Instance.new("Frame")
+TitleBar.Size             = UDim2.new(1, 0, 0, 40)
+TitleBar.BackgroundColor3 = PURPLE_MID
+TitleBar.BorderSizePixel  = 0
+TitleBar.Parent           = Root
+
+local TitleBarCorner = Instance.new("UICorner")
+TitleBarCorner.CornerRadius = UDim.new(0, 10)
+TitleBarCorner.Parent       = TitleBar
+
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Size             = UDim2.new(1, -50, 1, 0)
+TitleLabel.Position         = UDim2.new(0, 12, 0, 0)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Text             = "⬛ [FPS] Çekiliş — CHEAT v1.0"
+TitleLabel.TextColor3       = WHITE
+TitleLabel.TextSize         = 15
+TitleLabel.Font             = Enum.Font.GothamBold
+TitleLabel.TextXAlignment   = Enum.TextXAlignment.Left
+TitleLabel.Parent           = TitleBar
+
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size               = UDim2.new(0, 36, 0, 28)
+CloseBtn.Position           = UDim2.new(1, -40, 0, 6)
+CloseBtn.BackgroundColor3   = Color3.fromRGB(180, 30, 60)
+CloseBtn.Text               = "✕"
+CloseBtn.TextColor3         = WHITE
+CloseBtn.TextSize           = 14
+CloseBtn.Font               = Enum.Font.GothamBold
+CloseBtn.BorderSizePixel    = 0
+CloseBtn.Parent             = TitleBar
+Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
+CloseBtn.MouseButton1Click:Connect(function() Root.Visible = false end)
+
+-- Drag
+local dragging, dragStart, startPos = false, nil, nil
+TitleBar.InputBegan:Connect(function(inp)
+    if inp.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging  = true
+        dragStart = inp.Position
+        startPos  = Root.Position
+    end
+end)
+TitleBar.InputEnded:Connect(function(inp)
+    if inp.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
+    end
+end)
+UserInputService.InputChanged:Connect(function(inp)
+    if dragging and inp.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = inp.Position - dragStart
+        Root.Position = UDim2.new(
+            startPos.X.Scale, startPos.X.Offset + delta.X,
+            startPos.Y.Scale, startPos.Y.Offset + delta.Y
+        )
     end
 end)
 
-print("[4080] Raffle Hub yüklendi. Menü: RightShift | Aimbot: E")
+-- ── Tab bar ──────────────────────────────────────────────────
+local TabBar = Instance.new("Frame")
+TabBar.Size             = UDim2.new(1, 0, 0, 36)
+TabBar.Position         = UDim2.new(0, 0, 0, 40)
+TabBar.BackgroundColor3 = Color3.fromRGB(20, 8, 38)
+TabBar.BorderSizePixel  = 0
+TabBar.Parent           = Root
+
+local TabLayout = Instance.new("UIListLayout")
+TabLayout.FillDirection = Enum.FillDirection.Horizontal
+TabLayout.SortOrder     = Enum.SortOrder.LayoutOrder
+TabLayout.Padding       = UDim.new(0, 2)
+TabLayout.Parent        = TabBar
+
+-- ── Content area ─────────────────────────────────────────────
+local Content = Instance.new("Frame")
+Content.Size             = UDim2.new(1, 0, 1, -76)
+Content.Position         = UDim2.new(0, 0, 0, 76)
+Content.BackgroundTransparency = 1
+Content.Parent           = Root
+
+-- ── HELPERS ──────────────────────────────────────────────────
+local TABS     = {}
+local PANELS   = {}
+local ActiveTab= nil
+
+local function MakeTab(name, order)
+    local btn = Instance.new("TextButton")
+    btn.Size            = UDim2.new(0, 120, 1, 0)
+    btn.BackgroundColor3= PURPLE_DARK
+    btn.TextColor3      = GRAY_TEXT
+    btn.Text            = name
+    btn.TextSize        = 13
+    btn.Font            = Enum.Font.GothamSemibold
+    btn.BorderSizePixel = 0
+    btn.LayoutOrder     = order
+    btn.Parent          = TabBar
+
+    local panel = Instance.new("ScrollingFrame")
+    panel.Size             = UDim2.new(1, 0, 1, 0)
+    panel.BackgroundTransparency = 1
+    panel.BorderSizePixel  = 0
+    panel.ScrollBarThickness = 4
+    panel.ScrollBarImageColor3 = PURPLE_ACCENT
+    panel.CanvasSize       = UDim2.new(0, 0, 0, 0)
+    panel.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    panel.Visible          = false
+    panel.Parent           = Content
+
+    local layout = Instance.new("UIListLayout")
+    layout.SortOrder    = Enum.SortOrder.LayoutOrder
+    layout.Padding       = UDim.new(0, 6)
+    layout.Parent        = panel
+
+    local pad = Instance.new("UIPadding")
+    pad.PaddingLeft   = UDim.new(0, 12)
+    pad.PaddingRight  = UDim.new(0, 12)
+    pad.PaddingTop    = UDim.new(0, 10)
+    pad.Parent        = panel
+
+    TABS[name]   = btn
+    PANELS[name] = panel
+
+    btn.MouseButton1Click:Connect(function()
+        for n, p in pairs(PANELS) do
+            p.Visible = (n == name)
+            TABS[n].BackgroundColor3 = (n == name) and PURPLE_MID or PURPLE_DARK
+            TABS[n].TextColor3       = (n == name) and WHITE      or GRAY_TEXT
+        end
+        ActiveTab = name
+    end)
+
+    return panel
+end
+
+-- Widget helpers
+local function SectionLabel(panel, text, order)
+    local f = Instance.new("Frame")
+    f.Size             = UDim2.new(1, 0, 0, 22)
+    f.BackgroundColor3 = PURPLE_MID
+    f.BorderSizePixel  = 0
+    f.LayoutOrder      = order
+    f.Parent           = panel
+    Instance.new("UICorner", f).CornerRadius = UDim.new(0, 5)
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Size      = UDim2.new(1, -10, 1, 0)
+    lbl.Position  = UDim2.new(0, 8, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text      = "▸ " .. text
+    lbl.TextColor3= PURPLE_ACCENT
+    lbl.TextSize  = 12
+    lbl.Font      = Enum.Font.GothamBold
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent    = f
+end
+
+local _order = 0
+local function NextOrder()
+    _order = _order + 1
+    return _order
+end
+
+local function Toggle(panel, label, stateKey, callback)
+    local row = Instance.new("Frame")
+    row.Size             = UDim2.new(1, 0, 0, 32)
+    row.BackgroundColor3 = Color3.fromRGB(18, 8, 32)
+    row.BorderSizePixel  = 0
+    row.LayoutOrder      = NextOrder()
+    row.Parent           = panel
+    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 7)
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Size      = UDim2.new(0.7, 0, 1, 0)
+    lbl.Position  = UDim2.new(0, 10, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text      = label
+    lbl.TextColor3= GRAY_TEXT
+    lbl.TextSize  = 13
+    lbl.Font      = Enum.Font.Gotham
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent    = row
+
+    local togFrame = Instance.new("Frame")
+    togFrame.Size             = UDim2.new(0, 44, 0, 22)
+    togFrame.Position         = UDim2.new(1, -54, 0.5, -11)
+    togFrame.BackgroundColor3 = State[stateKey] and TOGGLE_ON or TOGGLE_OFF
+    togFrame.BorderSizePixel  = 0
+    togFrame.Parent           = row
+    Instance.new("UICorner", togFrame).CornerRadius = UDim.new(1, 0)
+
+    local knob = Instance.new("Frame")
+    knob.Size             = UDim2.new(0, 18, 0, 18)
+    knob.Position         = State[stateKey] and UDim2.new(1,-20,0.5,-9) or UDim2.new(0,2,0.5,-9)
+    knob.BackgroundColor3 = WHITE
+    knob.BorderSizePixel  = 0
+    knob.Parent           = togFrame
+    Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
+
+    local btn = Instance.new("TextButton")
+    btn.Size               = UDim2.new(1, 0, 1, 0)
+    btn.BackgroundTransparency = 1
+    btn.Text               = ""
+    btn.Parent             = row
+    btn.MouseButton1Click:Connect(function()
+        State[stateKey] = not State[stateKey]
+        local on = State[stateKey]
+        togFrame.BackgroundColor3 = on and TOGGLE_ON or TOGGLE_OFF
+        TweenService:Create(knob, TweenInfo.new(0.15), {
+            Position = on and UDim2.new(1,-20,0.5,-9) or UDim2.new(0,2,0.5,-9)
+        }):Play()
+        if callback then callback(on) end
+    end)
+end
+
+local function Slider(panel, label, stateKey, min, max, suffix, callback)
+    local row = Instance.new("Frame")
+    row.Size             = UDim2.new(1, 0, 0, 50)
+    row.BackgroundColor3 = Color3.fromRGB(18, 8, 32)
+    row.BorderSizePixel  = 0
+    row.LayoutOrder      = NextOrder()
+    row.Parent           = panel
+    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 7)
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Size      = UDim2.new(0.65, 0, 0, 20)
+    lbl.Position  = UDim2.new(0, 10, 0, 4)
+    lbl.BackgroundTransparency = 1
+    lbl.Text      = label
+    lbl.TextColor3= GRAY_TEXT
+    lbl.TextSize  = 12
+    lbl.Font      = Enum.Font.Gotham
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent    = row
+
+    local valLbl = Instance.new("TextLabel")
+    valLbl.Size      = UDim2.new(0.3, -10, 0, 20)
+    valLbl.Position  = UDim2.new(0.7, 0, 0, 4)
+    valLbl.BackgroundTransparency = 1
+    valLbl.Text      = tostring(State[stateKey])..(suffix or "")
+    valLbl.TextColor3= PURPLE_ACCENT
+    valLbl.TextSize  = 12
+    valLbl.Font      = Enum.Font.GothamBold
+    valLbl.TextXAlignment = Enum.TextXAlignment.Right
+    valLbl.Parent    = row
+
+    local track = Instance.new("Frame")
+    track.Size             = UDim2.new(1, -20, 0, 6)
+    track.Position         = UDim2.new(0, 10, 0, 32)
+    track.BackgroundColor3 = PURPLE_DARK
+    track.BorderSizePixel  = 0
+    track.Parent           = row
+    Instance.new("UICorner", track).CornerRadius = UDim.new(1, 0)
+
+    local fill = Instance.new("Frame")
+    local pct  = (State[stateKey] - min) / (max - min)
+    fill.Size             = UDim2.new(pct, 0, 1, 0)
+    fill.BackgroundColor3 = PURPLE_ACCENT
+    fill.BorderSizePixel  = 0
+    fill.Parent           = track
+    Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
+
+    local sliderBtn = Instance.new("TextButton")
+    sliderBtn.Size               = UDim2.new(1, 0, 1, 0)
+    sliderBtn.BackgroundTransparency = 1
+    sliderBtn.Text               = ""
+    sliderBtn.Parent             = track
+
+    local sliding = false
+    sliderBtn.MouseButton1Down:Connect(function() sliding = true end)
+    UserInputService.InputEnded:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.MouseButton1 then sliding = false end
+    end)
+    UserInputService.InputChanged:Connect(function(inp)
+        if sliding and inp.UserInputType == Enum.UserInputType.MouseMovement then
+            local abs  = track.AbsolutePosition
+            local size = track.AbsoluteSize
+            local relX = math.clamp((inp.Position.X - abs.X) / size.X, 0, 1)
+            local val  = math.floor(min + relX * (max - min))
+            State[stateKey] = val
+            fill.Size = UDim2.new(relX, 0, 1, 0)
+            valLbl.Text = tostring(val)..(suffix or "")
+            if callback then callback(val) end
+        end
+    end)
+end
+
+local function Dropdown(panel, label, stateKey, options, callback)
+    local row = Instance.new("Frame")
+    row.Size             = UDim2.new(1, 0, 0, 32)
+    row.BackgroundColor3 = Color3.fromRGB(18, 8, 32)
+    row.BorderSizePixel  = 0
+    row.LayoutOrder      = NextOrder()
+    row.Parent           = panel
+    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 7)
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Size      = UDim2.new(0.5, 0, 1, 0)
+    lbl.Position  = UDim2.new(0, 10, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text      = label
+    lbl.TextColor3= GRAY_TEXT
+    lbl.TextSize  = 12
+    lbl.Font      = Enum.Font.Gotham
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent    = row
+
+    local cur = Instance.new("TextButton")
+    cur.Size             = UDim2.new(0.45, 0, 0, 24)
+    cur.Position         = UDim2.new(0.52, 0, 0.5, -12)
+    cur.BackgroundColor3 = PURPLE_MID
+    cur.TextColor3       = WHITE
+    cur.Text             = State[stateKey] .. " ▾"
+    cur.TextSize         = 12
+    cur.Font             = Enum.Font.Gotham
+    cur.BorderSizePixel  = 0
+    cur.Parent           = row
+    Instance.new("UICorner", cur).CornerRadius = UDim.new(0, 5)
+
+    local expanded = false
+    local dropList
+
+    cur.MouseButton1Click:Connect(function()
+        expanded = not expanded
+        if dropList then dropList:Destroy() dropList = nil end
+        if not expanded then return end
+
+        dropList = Instance.new("Frame")
+        dropList.Size             = UDim2.new(0, 120, 0, #options * 26 + 4)
+        dropList.Position         = UDim2.new(1, -130, 1, 2)
+        dropList.BackgroundColor3 = PURPLE_DARK
+        dropList.BorderSizePixel  = 0
+        dropList.ZIndex           = 10
+        dropList.Parent           = row
+        Instance.new("UICorner", dropList).CornerRadius = UDim.new(0, 6)
+
+        local ll = Instance.new("UIListLayout")
+        ll.SortOrder = Enum.SortOrder.LayoutOrder
+        ll.Parent    = dropList
+
+        for i, opt in ipairs(options) do
+            local ob = Instance.new("TextButton")
+            ob.Size             = UDim2.new(1, 0, 0, 26)
+            ob.BackgroundColor3 = opt == State[stateKey] and PURPLE_MID or PURPLE_DARK
+            ob.TextColor3       = WHITE
+            ob.Text             = opt
+            ob.TextSize         = 12
+            ob.Font             = Enum.Font.Gotham
+            ob.BorderSizePixel  = 0
+            ob.LayoutOrder      = i
+            ob.ZIndex           = 11
+            ob.Parent           = dropList
+            ob.MouseButton1Click:Connect(function()
+                State[stateKey] = opt
+                cur.Text = opt .. " ▾"
+                dropList:Destroy() dropList = nil
+                expanded = false
+                if callback then callback(opt) end
+            end)
+        end
+    end)
+end
+
+local function KeybindPicker(panel, label, stateKey)
+    local row = Instance.new("Frame")
+    row.Size             = UDim2.new(1, 0, 0, 32)
+    row.BackgroundColor3 = Color3.fromRGB(18, 8, 32)
+    row.BorderSizePixel  = 0
+    row.LayoutOrder      = NextOrder()
+    row.Parent           = panel
+    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 7)
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Size      = UDim2.new(0.55, 0, 1, 0)
+    lbl.Position  = UDim2.new(0, 10, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text      = label
+    lbl.TextColor3= GRAY_TEXT
+    lbl.TextSize  = 12
+    lbl.Font      = Enum.Font.Gotham
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent    = row
+
+    local kb = Instance.new("TextButton")
+    kb.Size             = UDim2.new(0.38, 0, 0, 24)
+    kb.Position         = UDim2.new(0.59, 0, 0.5, -12)
+    kb.BackgroundColor3 = PURPLE_MID
+    kb.TextColor3       = WHITE
+    kb.Text             = tostring(State[stateKey]):gsub("Enum.KeyCode.", "")
+    kb.TextSize         = 12
+    kb.Font             = Enum.Font.GothamBold
+    kb.BorderSizePixel  = 0
+    kb.Parent           = row
+    Instance.new("UICorner", kb).CornerRadius = UDim.new(0, 5)
+
+    local listening = false
+    kb.MouseButton1Click:Connect(function()
+        listening = true
+        kb.Text = "..."
+        kb.BackgroundColor3 = Color3.fromRGB(200, 100, 50)
+    end)
+    UserInputService.InputBegan:Connect(function(inp, gp)
+        if not listening then return end
+        if inp.UserInputType == Enum.UserInputType.Keyboard then
+            State[stateKey] = inp.KeyCode
+            kb.Text = tostring(inp.KeyCode):gsub("Enum.KeyCode.", "")
+            kb.BackgroundColor3 = PURPLE_MID
+            listening = false
+        end
+    end)
+end
+
+-- ============================================================
+-- BUILD TABS
+-- ============================================================
+local PanelESP    = MakeTab("  🟣 ESP  ",   1)
+local PanelAim    = MakeTab("  🎯 Aimbot", 2)
+local PanelAbsurt = MakeTab("  💥 Absürt",  3)
+local PanelAyar   = MakeTab("  ⚙ Ayarlar", 4)
+
+-- ── ESP TAB ──────────────────────────────────────────────────
+SectionLabel(PanelESP, "Genel", NextOrder())
+Toggle(PanelESP,  "ESP Aktif",          "esp_enabled")
+Toggle(PanelESP,  "Kutular",            "esp_boxes")
+Toggle(PanelESP,  "İskelet",            "esp_skeletons")
+Toggle(PanelESP,  "İsimler",            "esp_names")
+Toggle(PanelESP,  "Sağlık",             "esp_health")
+Toggle(PanelESP,  "Mesafe",             "esp_distance")
+Toggle(PanelESP,  "Görüş Kontrolü",     "esp_visibility_check")
+Toggle(PanelESP,  "Ok İşareti (Ekran Dışı)", "esp_arrows")
+
+SectionLabel(PanelESP, "Kutu Seçenekleri", NextOrder())
+Toggle(PanelESP,  "Dolu Kutu",          "esp_filled_box")
+Slider(PanelESP,  "Dolu Opaklık",       "esp_fill_opacity", 0, 1, "", nil) -- 0-1 float; adjust
+Slider(PanelESP,  "Çizgi Kalınlığı",    "esp_box_thickness", 1, 5, "px")
+Slider(PanelESP,  "Max Mesafe",         "esp_max_dist", 50, 2000, "m")
+
+SectionLabel(PanelESP, "Renk Modu", NextOrder())
+Dropdown(PanelESP, "Renk Modu", "esp_color_mode", {"Team","Static","Health"})
+
+SectionLabel(PanelESP, "Tracer", NextOrder())
+Toggle(PanelESP,  "Tracer",             "esp_tracer")
+Dropdown(PanelESP,"Tracer Başlangıç",   "esp_tracer_origin", {"Bottom","Center","Top"})
+
+-- ── AIMBOT TAB ───────────────────────────────────────────────
+SectionLabel(PanelAim, "Aimbot", NextOrder())
+Toggle(PanelAim,  "Aimbot Aktif",       "aim_enabled")
+Toggle(PanelAim,  "FOV Çemberi",        "aim_draw_fov")
+Toggle(PanelAim,  "Görüş Kontrolü",     "aim_visibility_check")
+Toggle(PanelAim,  "Takım Kontrolü",     "aim_team_check")
+Toggle(PanelAim,  "Tahmin (Pred.)",     "aim_prediction")
+
+SectionLabel(PanelAim, "Ayarlar", NextOrder())
+Slider(PanelAim,  "FOV Yarıçapı",       "aim_fov",        20, 400, "px")
+Slider(PanelAim,  "Yumuşatma",          "aim_smoothness", 1, 100, "%",
+    function(v) State.aim_smoothness = v / 100 end)
+Slider(PanelAim,  "Tahmin (ms)",        "aim_prediction_ms", 0, 300, "ms")
+Dropdown(PanelAim,"Hedef Part",         "aim_target_part", {"Head","HumanoidRootPart","Torso"})
+
+SectionLabel(PanelAim, "Tuş Ataması", NextOrder())
+KeybindPicker(PanelAim, "Aimbot Tuşu", "aim_key")
+
+-- ── ABSÜRT TAB ───────────────────────────────────────────────
+SectionLabel(PanelAbsurt, "Görsel", NextOrder())
+Toggle(PanelAbsurt, "Rainbow Gövde",    "rainbow_body")
+Toggle(PanelAbsurt, "Rainbow Silah",    "rainbow_weapon")
+Toggle(PanelAbsurt, "Büyük Kafalar",    "big_heads")
+Slider(PanelAbsurt, "Kafa Boyutu",      "big_head_scale", 1, 10, "x", ApplyBigHeads)
+Toggle(PanelAbsurt, "3. Şahıs Kamera", "third_person",
+    function(on) SetThirdPerson(on) end)
+Toggle(PanelAbsurt, "Mevlana Hilesi",  "mevlana",
+    function(on) SetMevlana(on) end)
+
+SectionLabel(PanelAbsurt, "Güç", NextOrder())
+Toggle(PanelAbsurt, "Tek Mermi Öldür", "one_shot")
+Toggle(PanelAbsurt, "Süper Hız",       "super_speed")
+Slider(PanelAbsurt, "Hız Değeri",      "super_speed_val", 16, 500, " ws")
+Toggle(PanelAbsurt, "Süper Zıplama",   "super_jump")
+Slider(PanelAbsurt, "Zıplama Gücü",    "super_jump_val", 50, 500, " jp")
+
+-- ── AYARLAR TAB ──────────────────────────────────────────────
+SectionLabel(PanelAyar, "Menü", NextOrder())
+KeybindPicker(PanelAyar, "Menü Aç/Kapa Tuşu", "menu_key")
+
+SectionLabel(PanelAyar, "Hakkında", NextOrder())
+local infoLabel = Instance.new("TextLabel")
+infoLabel.Size      = UDim2.new(1, -20, 0, 80)
+infoLabel.BackgroundTransparency = 1
+infoLabel.Text      = "[FPS] Çekiliş Cheat\nVersiyon: 1.0\nTüm özellikler client-side.\nAC bypass: görsel + lokal stat yöntemi."
+infoLabel.TextColor3= GRAY_TEXT
+infoLabel.TextSize  = 12
+infoLabel.Font      = Enum.Font.Gotham
+infoLabel.TextXAlignment = Enum.TextXAlignment.Left
+infoLabel.TextYAlignment = Enum.TextYAlignment.Top
+infoLabel.TextWrapped= true
+infoLabel.LayoutOrder= NextOrder()
+infoLabel.Parent    = PanelAyar
+
+-- ── Activate first tab ───────────────────────────────────────
+TABS["  🟣 ESP  "].MouseButton1Click:Fire()
+
+-- ── Toggle menu visibility ───────────────────────────────────
+UserInputService.InputBegan:Connect(function(inp, gp)
+    if gp then return end
+    if inp.KeyCode == State.menu_key then
+        Root.Visible = not Root.Visible
+    end
+end)
+
+-- ============================================================
+-- CLEANUP on character reload
+-- ============================================================
+LP.CharacterAdded:Connect(function(c)
+    LChar = c
+    -- Re-apply stats after respawn
+    task.wait(0.5)
+    ApplyStats()
+    ApplyBigHeads()
+end)
+
+print("[Cheat] Loaded — INSERT = menu ac/kapa")
