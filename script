@@ -9,7 +9,6 @@
   RAZE v1.0  |  Roblox One-Tap Suite
   Runtime : Synapse X / KRNL / Fluxus / Electron
   Language: Luau (executor environment)
-  Author  : your bench
 
   Classic  : ESP · Aimbot (one-tap) · Speed
   Extras   : Mevlana · Kill Aura · Ghost Mode
@@ -40,7 +39,6 @@ local mouse  = lp:GetMouse()
 -- ══════════════════════════════════════════════
 
 local cfg = {
-    -- ESP
     esp            = true,
     esp_boxes      = true,
     esp_names      = true,
@@ -49,53 +47,37 @@ local cfg = {
     esp_color      = Color3.fromRGB(230, 40, 55),
     esp_thickness  = 1.5,
 
-    -- Aimbot
     aimbot         = false,
     aim_fov        = 120,
-    aim_smooth     = 0.12,        -- 0 = snap, 1 = barely moves
-    aim_bone       = "Head",      -- "Head" | "HumanoidRootPart"
+    aim_smooth     = 0.12,
+    aim_bone       = "Head",
     aim_key        = Enum.UserInputType.MouseButton2,
     silent_aim     = false,
 
-    -- Speed
     speed          = false,
     speed_val      = 40,
 
-    -- [1] Mevlana Hilesi — rapid spin
     mevlana        = false,
-    mevlana_spd    = 60,          -- degrees per second
+    mevlana_spd    = 60,
 
-    -- [2] Kill Aura
     killaura       = false,
     aura_radius    = 18,
     aura_dmg       = 20,
-    aura_rate      = 0.12,        -- seconds between ticks
+    aura_rate      = 0.12,
 
-    -- [3] Ghost Mode
     ghost          = false,
     ghost_alpha    = 0.72,
 
-    -- [4] Hitbox Expander
     hitbox         = false,
     hitbox_sz      = 7,
 
-    -- [5] Silent Aim (handled in aim update; flag here)
-    -- (flag above: cfg.silent_aim)
-
-    -- [6] Bhop
     bhop           = false,
-
-    -- [7] Noclip
     noclip         = false,
-
-    -- [8] Anti-AFK
     antiafk        = false,
 
-    -- [9] FOV Changer
     fov_change     = false,
     fov_val        = 90,
 
-    -- [10] Player Tracker (minimap)
     tracker        = false,
 }
 
@@ -210,18 +192,15 @@ local function espUpdate()
         local x = hSP.X - w * 0.5
         local y = hSP.Y - h * 0.05
 
-        -- Box
         ob.box.Visible  = cfg.esp_boxes
         ob.box.Position = Vector2.new(x, y)
         ob.box.Size     = Vector2.new(w, h)
         ob.box.Color    = cfg.esp_color
 
-        -- Name
         ob.name.Visible   = cfg.esp_names
         ob.name.Text      = p.Name
         ob.name.Position  = Vector2.new(hSP.X, y - 16)
 
-        -- Health bar
         local hum  = getHum(p)
         local pct  = hum and math.clamp(hum.Health / hum.MaxHealth, 0, 1) or 0
         local barH = h * pct
@@ -235,7 +214,6 @@ local function espUpdate()
             math.floor((1 - pct) * 255),
             math.floor(pct * 210), 35)
 
-        -- Tracer
         local vp = cam.ViewportSize
         ob.tracer.Visible = cfg.esp_tracers
         ob.tracer.From    = Vector2.new(vp.X * 0.5, vp.Y)
@@ -244,10 +222,9 @@ local function espUpdate()
 end
 
 -- ══════════════════════════════════════════════
---  AIMBOT — ONE TAP (+ SILENT AIM)
+--  AIMBOT
 -- ══════════════════════════════════════════════
 
--- FOV circle drawn once, updated every frame
 local fovCircle = Drawing.new("Circle")
 fovCircle.Filled    = false
 fovCircle.Color     = Color3.fromRGB(255, 255, 255)
@@ -273,12 +250,8 @@ local function aimbotUpdate()
     if not b then return end
 
     if cfg.silent_aim then
-        -- Silent aim: raycast from camera toward bone on server hit detection
-        -- Override mouse position in the WorldToScreenPoint path via CFrame nudge
-        -- (executor-level: moves aim without cursor movement)
         local bSP, ok = w2v(b.Position)
         if ok then
-            -- Use mousemoverel for zero-visible-cursor movement targeting
             local cur = Vector2.new(mouse.X, mouse.Y)
             local off = bSP - cur
             mousemoverel(off.X, off.Y)
@@ -288,7 +261,6 @@ local function aimbotUpdate()
         return
     end
 
-    -- Smooth aimbot
     local bSP, ok = w2v(b.Position)
     if not ok then return end
     local cur   = Vector2.new(mouse.X, mouse.Y)
@@ -297,7 +269,8 @@ local function aimbotUpdate()
 end
 
 -- ══════════════════════════════════════════════
---  SPEED HACK
+--  SPEED / MEVLANA / GHOST / HITBOX / BHOP
+--  NOCLIP / ANTI-AFK / FOV
 -- ══════════════════════════════════════════════
 
 local function speedApply()
@@ -305,13 +278,8 @@ local function speedApply()
     if h then h.WalkSpeed = cfg.speed and cfg.speed_val or 16 end
 end
 
--- ══════════════════════════════════════════════
---  [1] MEVLANA HİLESİ — SPIN HACK
--- ══════════════════════════════════════════════
-
 local mevlanaAngle = 0
 local mevlanaConn
-
 local function mevlanaToggle()
     if mevlanaConn then mevlanaConn:Disconnect(); mevlanaConn = nil end
     if not cfg.mevlana then return end
@@ -320,15 +288,10 @@ local function mevlanaToggle()
         local root = c and c:FindFirstChild("HumanoidRootPart")
         if not root then return end
         mevlanaAngle = mevlanaAngle + cfg.mevlana_spd * dt
-        -- Preserve Y position and apply spin on Y-axis
         root.CFrame = CFrame.new(root.Position)
             * CFrame.Angles(0, math.rad(mevlanaAngle), 0)
     end)
 end
-
--- ══════════════════════════════════════════════
---  [2] KILL AURA
--- ══════════════════════════════════════════════
 
 local lastAura = 0
 local function killAuraUpdate()
@@ -336,10 +299,8 @@ local function killAuraUpdate()
     local now = tick()
     if now - lastAura < cfg.aura_rate then return end
     lastAura = now
-
     local selfRoot = getHRP(lp)
     if not selfRoot then return end
-
     for _, p in ipairs(enemies()) do
         local tr = getHRP(p)
         if tr and (selfRoot.Position - tr.Position).Magnitude <= cfg.aura_radius then
@@ -351,10 +312,6 @@ local function killAuraUpdate()
     end
 end
 
--- ══════════════════════════════════════════════
---  [3] GHOST MODE
--- ══════════════════════════════════════════════
-
 local function ghostApply()
     local c = lp.Character
     if not c then return end
@@ -364,10 +321,6 @@ local function ghostApply()
         end
     end
 end
-
--- ══════════════════════════════════════════════
---  [4] HİTBOX GENİŞLETİCİ
--- ══════════════════════════════════════════════
 
 local function hitboxApply()
     for _, p in ipairs(Players:GetPlayers()) do
@@ -384,10 +337,6 @@ local function hitboxApply()
     end
 end
 
--- ══════════════════════════════════════════════
---  [6] BHOP
--- ══════════════════════════════════════════════
-
 local bhopConn
 local function bhopToggle()
     if bhopConn then bhopConn:Disconnect(); bhopConn = nil end
@@ -397,21 +346,15 @@ local function bhopToggle()
         local h    = c and c:FindFirstChildOfClass("Humanoid")
         local root = c and c:FindFirstChild("HumanoidRootPart")
         if h and root then
-            -- Jump the frame velocity crosses zero upward
             if math.abs(root.Velocity.Y) < 2 then h.Jump = true end
         end
     end)
 end
 
--- ══════════════════════════════════════════════
---  [7] NOCLIP
--- ══════════════════════════════════════════════
-
 local noclipConn
 local function noclipToggle()
     if noclipConn then noclipConn:Disconnect(); noclipConn = nil end
     if not cfg.noclip then
-        -- Restore collision
         local c = lp.Character
         if c then
             for _, p in ipairs(c:GetDescendants()) do
@@ -430,31 +373,22 @@ local function noclipToggle()
     end)
 end
 
--- ══════════════════════════════════════════════
---  [8] ANTİ-AFK
--- ══════════════════════════════════════════════
-
 local afkConn
 local function afkToggle()
     if afkConn then afkConn:Disconnect(); afkConn = nil end
     if not cfg.antiafk then return end
     afkConn = RunService.Heartbeat:Connect(function()
-        -- Simulate mouse micro-movement — AFK detection resets
         VirtualUser:Button2Down(Vector2.new(0, 0), cam.CFrame)
         VirtualUser:Button2Up(Vector2.new(0, 0), cam.CFrame)
     end)
 end
-
--- ══════════════════════════════════════════════
---  [9] FOV DEĞİŞTİRİCİ
--- ══════════════════════════════════════════════
 
 local function fovApply()
     cam.FieldOfView = cfg.fov_change and cfg.fov_val or 70
 end
 
 -- ══════════════════════════════════════════════
---  [10] PLAYER TRACKER — MİNİHARİTA
+--  PLAYER TRACKER (minimap — Drawing, unchanged)
 -- ══════════════════════════════════════════════
 
 local trackerPool = {}
@@ -482,7 +416,6 @@ local function trackerUpdate()
     local my  = vp.Y - MAP_SIZE - MAP_PAD
     local mid = Vector2.new(mx + MAP_SIZE * 0.5, my + MAP_SIZE * 0.5)
 
-    -- Background
     trackerDraw("Square", {
         Visible=true, Position=Vector2.new(mx, my),
         Size=Vector2.new(MAP_SIZE, MAP_SIZE),
@@ -499,8 +432,6 @@ local function trackerUpdate()
         Position=Vector2.new(mx + 4, my + 2),
         Size=10, Color=Color3.fromRGB(220,40,55), Outline=true,
     })
-
-    -- Self dot (white)
     trackerDraw("Circle", {
         Visible=true, Position=mid, Radius=4,
         Color=Color3.new(1,1,1), Filled=true, Thickness=0,
@@ -509,18 +440,14 @@ local function trackerUpdate()
     local selfRoot = getHRP(lp)
     if not selfRoot then return end
 
-    -- Scale: 1 stud = MAP_SIZE / 500 pixels (covers ~250 stud radius)
     local SCALE = MAP_SIZE / 500
-
     for _, p in ipairs(enemies()) do
         local tr = getHRP(p)
         if not tr then continue end
-
         local rel   = tr.Position - selfRoot.Position
         local dotX  = math.clamp(rel.X * SCALE, -MAP_SIZE*0.5 + 6, MAP_SIZE*0.5 - 6)
         local dotZ  = math.clamp(rel.Z * SCALE, -MAP_SIZE*0.5 + 6, MAP_SIZE*0.5 - 6)
         local dotPos = Vector2.new(mid.X + dotX, mid.Y + dotZ)
-
         trackerDraw("Circle", {
             Visible=true, Position=dotPos, Radius=4,
             Color=cfg.esp_color, Filled=true, Thickness=0,
@@ -534,432 +461,938 @@ local function trackerUpdate()
 end
 
 -- ══════════════════════════════════════════════
---  MENU SYSTEM
+--  PALETTE
 -- ══════════════════════════════════════════════
 
-local menu = {
-    open   = false,
-    x      = 120, y = 80,
-    w      = 500, h = 490,
-    tab    = 1,
-    draws  = {},
-    tabs   = { "COMBAT", "VISUAL", "MOVEMENT", "EXTRAS" },
+local C = {
+    bg0     = Color3.fromRGB(8,   7,  12),   -- deepest black
+    bg1     = Color3.fromRGB(14,  12,  20),  -- panel bg
+    bg2     = Color3.fromRGB(22,  19,  32),  -- row bg
+    bg3     = Color3.fromRGB(32,  27,  48),  -- hover / active row
+    purple  = Color3.fromRGB(110,  55, 200), -- primary purple
+    purpleL = Color3.fromRGB(155,  90, 255), -- light purple (accent)
+    orange  = Color3.fromRGB(255, 120,  30), -- orange accent
+    orangeL = Color3.fromRGB(255, 165,  80), -- light orange
+    white   = Color3.fromRGB(235, 225, 255),
+    gray    = Color3.fromRGB(120, 110, 145),
+    green   = Color3.fromRGB(60,  210, 100),
+    red     = Color3.fromRGB(220,  50,  55),
 }
 
-local COL = {
-    bg1    = Color3.fromRGB(12, 12, 17),
-    bg2    = Color3.fromRGB(20, 20, 28),
-    bg3    = Color3.fromRGB(32, 32, 44),
-    accent = Color3.fromRGB(220, 40, 55),
-    white  = Color3.new(1, 1, 1),
-    gray   = Color3.fromRGB(135, 135, 150),
-    green  = Color3.fromRGB(50, 200, 80),
-}
+-- ══════════════════════════════════════════════
+--  GUI ROOT
+-- ══════════════════════════════════════════════
 
-local isDrag = false
-local dragSX, dragSY, menuStartX, menuStartY = 0, 0, 0, 0
+local gui = Instance.new("ScreenGui")
+gui.Name            = "RAZE_" .. math.random(1e5)
+gui.ResetOnSpawn    = false
+gui.ZIndexBehavior  = Enum.ZIndexBehavior.Sibling
+gui.DisplayOrder    = 999
+gui.IgnoreGuiInset  = true
 
-local function mD(typ, props)
-    local d = Drawing.new(typ)
-    for k, v in pairs(props) do d[k] = v end
-    menu.draws[#menu.draws + 1] = d
-    return d
+pcall(function()
+    gui.Parent = gethui and gethui() or game:GetService("CoreGui")
+end)
+if not gui.Parent then gui.Parent = lp.PlayerGui end
+
+-- ── WATERMARK ──────────────────────────────────
+local wmFrame = Instance.new("Frame")
+wmFrame.Size            = UDim2.new(0, 260, 0, 26)
+wmFrame.Position        = UDim2.new(0, 8, 0, 8)
+wmFrame.BackgroundColor3= C.bg1
+wmFrame.BorderSizePixel = 0
+wmFrame.Parent          = gui
+Instance.new("UICorner", wmFrame).CornerRadius = UDim.new(0, 6)
+
+local wmStroke = Instance.new("UIStroke", wmFrame)
+wmStroke.Color     = C.purple
+wmStroke.Thickness = 1
+
+local wmLabel = Instance.new("TextLabel", wmFrame)
+wmLabel.Size                = UDim2.new(1, -8, 1, 0)
+wmLabel.Position            = UDim2.new(0, 8, 0, 0)
+wmLabel.BackgroundTransparency = 1
+wmLabel.Font                = Enum.Font.GothamBold
+wmLabel.TextSize            = 12
+wmLabel.TextColor3          = C.white
+wmLabel.TextXAlignment      = Enum.TextXAlignment.Left
+wmLabel.Text                = "RAZE v1.0  |  " .. lp.Name .. "  |  -- fps"
+
+-- ── ROOT FRAME ─────────────────────────────────
+local root = Instance.new("Frame")
+root.Size            = UDim2.new(0, 520, 0, 500)
+root.Position        = UDim2.new(0.5, -260, 0.5, -250)
+root.BackgroundColor3= C.bg0
+root.BorderSizePixel = 0
+root.ClipsDescendants= true
+root.Visible         = false
+root.Parent          = gui
+Instance.new("UICorner", root).CornerRadius = UDim.new(0, 10)
+
+-- Outer glow stroke
+local rootStroke = Instance.new("UIStroke", root)
+rootStroke.Color     = C.purple
+rootStroke.Thickness = 1.5
+rootStroke.Transparency = 0
+
+-- Subtle gradient overlay
+local grad = Instance.new("UIGradient")
+grad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0,   Color3.fromRGB(18, 12, 30)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(8,   7, 12)),
+    ColorSequenceKeypoint.new(1,   Color3.fromRGB(14,  8, 22)),
+})
+grad.Rotation = 135
+grad.Parent   = root
+
+-- ── HEADER ─────────────────────────────────────
+local header = Instance.new("Frame", root)
+header.Size            = UDim2.new(1, 0, 0, 44)
+header.BackgroundColor3= C.bg1
+header.BorderSizePixel = 0
+Instance.new("UICorner", header).CornerRadius = UDim.new(0, 10)
+
+-- bottom edge of header clips rounded bottom corners
+local headerBot = Instance.new("Frame", root)
+headerBot.Size            = UDim2.new(1, 0, 0, 10)
+headerBot.Position        = UDim2.new(0, 0, 0, 34)
+headerBot.BackgroundColor3= C.bg1
+headerBot.BorderSizePixel = 0
+
+-- Accent line under header
+local accentLine = Instance.new("Frame", root)
+accentLine.Size            = UDim2.new(1, 0, 0, 2)
+accentLine.Position        = UDim2.new(0, 0, 0, 44)
+accentLine.BackgroundColor3= C.orange
+accentLine.BorderSizePixel = 0
+
+-- Logo gradient on accent line
+local accentGrad = Instance.new("UIGradient", accentLine)
+accentGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0,   C.purple),
+    ColorSequenceKeypoint.new(0.5, C.orange),
+    ColorSequenceKeypoint.new(1,   C.purple),
+})
+
+-- Title text
+local titleLabel = Instance.new("TextLabel", header)
+titleLabel.Size                = UDim2.new(0, 200, 1, 0)
+titleLabel.Position            = UDim2.new(0, 14, 0, 0)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Font                = Enum.Font.GothamBlack
+titleLabel.TextSize            = 17
+titleLabel.TextColor3          = C.white
+titleLabel.TextXAlignment      = Enum.TextXAlignment.Left
+titleLabel.Text                = "▶ RAZE"
+
+-- Subtitle
+local subLabel = Instance.new("TextLabel", header)
+subLabel.Size                = UDim2.new(0, 180, 1, 0)
+subLabel.Position            = UDim2.new(0, 74, 0, 0)
+subLabel.BackgroundTransparency = 1
+subLabel.Font                = Enum.Font.Gotham
+subLabel.TextSize            = 11
+subLabel.TextColor3          = C.orange
+subLabel.TextXAlignment      = Enum.TextXAlignment.Left
+subLabel.Text                = "v1.0  one-tap suite"
+
+-- Hint right
+local hintLabel = Instance.new("TextLabel", header)
+hintLabel.Size                = UDim2.new(0, 220, 1, 0)
+hintLabel.Position            = UDim2.new(1, -224, 0, 0)
+hintLabel.BackgroundTransparency = 1
+hintLabel.Font                = Enum.Font.Gotham
+hintLabel.TextSize            = 10
+hintLabel.TextColor3          = C.gray
+hintLabel.TextXAlignment      = Enum.TextXAlignment.Right
+hintLabel.Text                = "INSERT = toggle  |  F1–F6 hotkeys"
+
+-- ── DRAG ───────────────────────────────────────
+do
+    local dragging, dsx, dsy, sx, sy = false, 0, 0, 0, 0
+    header.InputBegan:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dsx, dsy = inp.Position.X, inp.Position.Y
+            sx = root.Position.X.Offset
+            sy = root.Position.Y.Offset
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(inp)
+        if dragging and inp.UserInputType == Enum.UserInputType.MouseMovement then
+            root.Position = UDim2.new(0, sx + inp.Position.X - dsx,
+                                      0, sy + inp.Position.Y - dsy)
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
 end
 
-local function menuClear()
-    for _, d in ipairs(menu.draws) do d:Remove() end
-    menu.draws = {}
+-- ── TAB BAR ────────────────────────────────────
+local TAB_NAMES = { "COMBAT", "VISUAL", "MOVEMENT", "EXTRAS" }
+local tabBar = Instance.new("Frame", root)
+tabBar.Size            = UDim2.new(1, 0, 0, 34)
+tabBar.Position        = UDim2.new(0, 0, 0, 46)
+tabBar.BackgroundColor3= C.bg1
+tabBar.BorderSizePixel = 0
+
+local tabLayout = Instance.new("UIListLayout", tabBar)
+tabLayout.FillDirection = Enum.FillDirection.Horizontal
+tabLayout.SortOrder     = Enum.SortOrder.LayoutOrder
+tabLayout.Padding       = UDim.new(0, 1)
+
+-- Active tab indicator (sliding bar)
+local tabIndicator = Instance.new("Frame", tabBar)
+tabIndicator.Size            = UDim2.new(1/#TAB_NAMES, -2, 0, 2)
+tabIndicator.Position        = UDim2.new(0, 1, 1, -2)
+tabIndicator.BackgroundColor3= C.orange
+tabIndicator.BorderSizePixel = 0
+tabIndicator.ZIndex          = 5
+
+-- ── CONTENT AREA ───────────────────────────────
+local content = Instance.new("Frame", root)
+content.Size            = UDim2.new(1, 0, 1, -80)
+content.Position        = UDim2.new(0, 0, 0, 80)
+content.BackgroundTransparency = 1
+content.ClipsDescendants       = true
+
+-- ── FOOTER ─────────────────────────────────────
+local footer = Instance.new("Frame", root)
+footer.Size            = UDim2.new(1, 0, 0, 22)
+footer.Position        = UDim2.new(0, 0, 1, -22)
+footer.BackgroundColor3= C.bg1
+footer.BorderSizePixel = 0
+
+local footerLine = Instance.new("Frame", footer)
+footerLine.Size            = UDim2.new(1, 0, 0, 1)
+footerLine.BackgroundColor3= C.purple
+footerLine.BorderSizePixel = 0
+
+local footerLabel = Instance.new("TextLabel", footer)
+footerLabel.Size                = UDim2.new(1, -8, 1, 0)
+footerLabel.Position            = UDim2.new(0, 8, 0, 0)
+footerLabel.BackgroundTransparency = 1
+footerLabel.Font                = Enum.Font.Gotham
+footerLabel.TextSize            = 10
+footerLabel.TextColor3          = C.gray
+footerLabel.TextXAlignment      = Enum.TextXAlignment.Left
+footerLabel.Text                = "ESP · Aimbot · Speed · Mevlana · KillAura · Ghost · Hitbox · SilentAim · Bhop · Noclip · AFK · FOV · Map"
+
+-- ══════════════════════════════════════════════
+--  WIDGET FACTORY
+-- ══════════════════════════════════════════════
+
+-- Creates a ScrollingFrame panel for a tab
+local function makePanel()
+    local sf = Instance.new("ScrollingFrame")
+    sf.Size                = UDim2.new(1, 0, 1, 0)
+    sf.BackgroundTransparency = 1
+    sf.BorderSizePixel     = 0
+    sf.ScrollBarThickness  = 3
+    sf.ScrollBarImageColor3= C.purple
+    sf.CanvasSize          = UDim2.new(0, 0, 0, 0)
+    sf.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    sf.Visible             = false
+    sf.Parent              = content
+
+    local layout = Instance.new("UIListLayout", sf)
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Padding   = UDim.new(0, 4)
+
+    local pad = Instance.new("UIPadding", sf)
+    pad.PaddingLeft   = UDim.new(0, 10)
+    pad.PaddingRight  = UDim.new(0, 10)
+    pad.PaddingTop    = UDim.new(0, 8)
+    pad.PaddingBottom = UDim.new(0, 8)
+
+    return sf
 end
 
--- Returns true if (px,py) is inside a toggle and toggles it
-local toggleAreas = {}  -- filled each render, used in click handler
+-- Section label
+local rowOrder = 0
+local function nextOrder() rowOrder = rowOrder + 1; return rowOrder end
 
-local function drawToggle(label, val, x, y)
-    toggleAreas[#toggleAreas + 1] = {x=x, y=y, w=220, h=22}
+local function addSection(panel, text)
+    local f = Instance.new("Frame", panel)
+    f.Size            = UDim2.new(1, 0, 0, 20)
+    f.BackgroundColor3= C.bg2
+    f.BorderSizePixel = 0
+    f.LayoutOrder     = nextOrder()
+    Instance.new("UICorner", f).CornerRadius = UDim.new(0, 5)
 
-    mD("Square", {
-        Visible=true, Position=Vector2.new(x, y),
-        Size=Vector2.new(220, 22), Color=val and COL.bg3 or COL.bg2,
-        Filled=true, Thickness=0,
-    })
-    mD("Square", {
-        Visible=true, Position=Vector2.new(x, y),
-        Size=Vector2.new(220, 22), Color=val and COL.accent or COL.bg3,
-        Filled=false, Thickness=val and 1.5 or 1,
-    })
-    -- LED
-    mD("Square", {
-        Visible=true, Position=Vector2.new(x+204, y+5),
-        Size=Vector2.new(12, 12), Color=val and COL.green or COL.gray,
-        Filled=true, Thickness=0,
-    })
-    mD("Text", {
-        Visible=true, Text=label,
-        Position=Vector2.new(x+8, y+4),
-        Size=13, Color=val and COL.white or COL.gray, Outline=true,
-    })
+    local stroke = Instance.new("UIStroke", f)
+    stroke.Color     = C.purple
+    stroke.Thickness = 1
+    stroke.Transparency = 0.6
+
+    local lbl = Instance.new("TextLabel", f)
+    lbl.Size                = UDim2.new(1, -10, 1, 0)
+    lbl.Position            = UDim2.new(0, 10, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Font                = Enum.Font.GothamBold
+    lbl.TextSize            = 11
+    lbl.TextColor3          = C.purpleL
+    lbl.TextXAlignment      = Enum.TextXAlignment.Left
+    lbl.Text                = "◈  " .. text
 end
 
-local function drawSlider(label, val, min, max, x, y, w)
-    w = w or 220
-    local pct = math.clamp((val - min) / (max - min), 0, 1)
-    mD("Text", {
-        Visible=true,
-        Text=label .. ": " .. tostring(math.floor(val)),
-        Position=Vector2.new(x, y),
-        Size=12, Color=COL.white, Outline=true,
+-- Toggle row  — returns a function to sync visual state
+local function addToggle(panel, label, cfgKey, sideEffect)
+    local row = Instance.new("Frame", panel)
+    row.Size            = UDim2.new(1, 0, 0, 34)
+    row.BackgroundColor3= C.bg2
+    row.BorderSizePixel = 0
+    row.LayoutOrder     = nextOrder()
+    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 7)
+
+    -- Hover effect
+    local hoverFrame = Instance.new("Frame", row)
+    hoverFrame.Size            = UDim2.new(1, 0, 1, 0)
+    hoverFrame.BackgroundColor3= C.purpleL
+    hoverFrame.BackgroundTransparency = 1
+    hoverFrame.BorderSizePixel = 0
+    Instance.new("UICorner", hoverFrame).CornerRadius = UDim.new(0, 7)
+
+    local lbl = Instance.new("TextLabel", row)
+    lbl.Size                = UDim2.new(1, -70, 1, 0)
+    lbl.Position            = UDim2.new(0, 12, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Font                = Enum.Font.Gotham
+    lbl.TextSize            = 13
+    lbl.TextColor3          = C.white
+    lbl.TextXAlignment      = Enum.TextXAlignment.Left
+    lbl.Text                = label
+
+    -- Switch track
+    local track = Instance.new("Frame", row)
+    track.Size            = UDim2.new(0, 40, 0, 20)
+    track.Position        = UDim2.new(1, -52, 0.5, -10)
+    track.BackgroundColor3= C.bg3
+    track.BorderSizePixel = 0
+    Instance.new("UICorner", track).CornerRadius = UDim.new(1, 0)
+
+    local trackStroke = Instance.new("UIStroke", track)
+    trackStroke.Color     = C.gray
+    trackStroke.Thickness = 1
+
+    -- Switch knob
+    local knob = Instance.new("Frame", track)
+    knob.Size            = UDim2.new(0, 16, 0, 16)
+    knob.Position        = UDim2.new(0, 2, 0.5, -8)
+    knob.BackgroundColor3= C.gray
+    knob.BorderSizePixel = 0
+    Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
+
+    local function syncVisual()
+        local on = cfg[cfgKey]
+        TweenService:Create(track, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+            BackgroundColor3 = on and C.purple or C.bg3,
+        }):Play()
+        TweenService:Create(trackStroke, TweenInfo.new(0.18), {
+            Color = on and C.purpleL or C.gray,
+        }):Play()
+        TweenService:Create(knob, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+            Position         = on and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8),
+            BackgroundColor3 = on and C.orangeL or C.gray,
+        }):Play()
+        lbl.TextColor3 = on and C.white or C.gray
+    end
+
+    syncVisual()
+
+    local btn = Instance.new("TextButton", row)
+    btn.Size               = UDim2.new(1, 0, 1, 0)
+    btn.BackgroundTransparency = 1
+    btn.Text               = ""
+
+    btn.MouseEnter:Connect(function()
+        TweenService:Create(hoverFrame, TweenInfo.new(0.12), {
+            BackgroundTransparency = 0.94,
+        }):Play()
+    end)
+    btn.MouseLeave:Connect(function()
+        TweenService:Create(hoverFrame, TweenInfo.new(0.12), {
+            BackgroundTransparency = 1,
+        }):Play()
+    end)
+    btn.MouseButton1Click:Connect(function()
+        cfg[cfgKey] = not cfg[cfgKey]
+        syncVisual()
+        if sideEffect then sideEffect() end
+    end)
+
+    return syncVisual
+end
+
+-- Two-column toggle layout helper
+local twoColBuffer = nil
+local function addToggle2Col(panel, label, cfgKey, sideEffect)
+    if not twoColBuffer then
+        -- Start a new two-column row
+        local wrapper = Instance.new("Frame", panel)
+        wrapper.Size            = UDim2.new(1, 0, 0, 34)
+        wrapper.BackgroundTransparency = 1
+        wrapper.BorderSizePixel = 0
+        wrapper.LayoutOrder     = nextOrder()
+
+        local layout2 = Instance.new("UIListLayout", wrapper)
+        layout2.FillDirection = Enum.FillDirection.Horizontal
+        layout2.Padding       = UDim.new(0, 6)
+
+        twoColBuffer = wrapper
+        -- Left cell
+        local cell = Instance.new("Frame", wrapper)
+        cell.Size            = UDim2.new(0.5, -3, 1, 0)
+        cell.BackgroundColor3= C.bg2
+        cell.BorderSizePixel = 0
+        Instance.new("UICorner", cell).CornerRadius = UDim.new(0, 7)
+        -- build toggle in cell
+        local lbl = Instance.new("TextLabel", cell)
+        lbl.Size                = UDim2.new(1, -50, 1, 0)
+        lbl.Position            = UDim2.new(0, 8, 0, 0)
+        lbl.BackgroundTransparency = 1
+        lbl.Font                = Enum.Font.Gotham
+        lbl.TextSize            = 12
+        lbl.TextColor3          = C.white
+        lbl.TextXAlignment      = Enum.TextXAlignment.Left
+        lbl.Text                = label
+
+        local track = Instance.new("Frame", cell)
+        track.Size            = UDim2.new(0, 36, 0, 18)
+        track.Position        = UDim2.new(1, -42, 0.5, -9)
+        track.BackgroundColor3= C.bg3
+        track.BorderSizePixel = 0
+        Instance.new("UICorner", track).CornerRadius = UDim.new(1, 0)
+        local tStroke = Instance.new("UIStroke", track)
+        tStroke.Color = C.gray; tStroke.Thickness = 1
+
+        local knob = Instance.new("Frame", track)
+        knob.Size            = UDim2.new(0, 14, 0, 14)
+        knob.Position        = UDim2.new(0, 2, 0.5, -7)
+        knob.BackgroundColor3= C.gray
+        knob.BorderSizePixel = 0
+        Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
+
+        local function sv()
+            local on = cfg[cfgKey]
+            TweenService:Create(track, TweenInfo.new(0.18), {BackgroundColor3 = on and C.purple or C.bg3}):Play()
+            TweenService:Create(tStroke, TweenInfo.new(0.18), {Color = on and C.purpleL or C.gray}):Play()
+            TweenService:Create(knob, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+                Position = on and UDim2.new(1,-16,0.5,-7) or UDim2.new(0,2,0.5,-7),
+                BackgroundColor3 = on and C.orangeL or C.gray,
+            }):Play()
+            lbl.TextColor3 = on and C.white or C.gray
+        end
+        sv()
+
+        local btn = Instance.new("TextButton", cell)
+        btn.Size = UDim2.new(1,0,1,0)
+        btn.BackgroundTransparency = 1
+        btn.Text = ""
+        btn.MouseButton1Click:Connect(function()
+            cfg[cfgKey] = not cfg[cfgKey]; sv()
+            if sideEffect then sideEffect() end
+        end)
+    else
+        -- Right cell
+        local wrapper = twoColBuffer
+        twoColBuffer = nil
+        local cell = Instance.new("Frame", wrapper)
+        cell.Size            = UDim2.new(0.5, -3, 1, 0)
+        cell.BackgroundColor3= C.bg2
+        cell.BorderSizePixel = 0
+        Instance.new("UICorner", cell).CornerRadius = UDim.new(0, 7)
+
+        local lbl = Instance.new("TextLabel", cell)
+        lbl.Size                = UDim2.new(1, -50, 1, 0)
+        lbl.Position            = UDim2.new(0, 8, 0, 0)
+        lbl.BackgroundTransparency = 1
+        lbl.Font                = Enum.Font.Gotham
+        lbl.TextSize            = 12
+        lbl.TextColor3          = C.white
+        lbl.TextXAlignment      = Enum.TextXAlignment.Left
+        lbl.Text                = label
+
+        local track = Instance.new("Frame", cell)
+        track.Size            = UDim2.new(0, 36, 0, 18)
+        track.Position        = UDim2.new(1, -42, 0.5, -9)
+        track.BackgroundColor3= C.bg3
+        track.BorderSizePixel = 0
+        Instance.new("UICorner", track).CornerRadius = UDim.new(1, 0)
+        local tStroke = Instance.new("UIStroke", track)
+        tStroke.Color = C.gray; tStroke.Thickness = 1
+
+        local knob = Instance.new("Frame", track)
+        knob.Size            = UDim2.new(0, 14, 0, 14)
+        knob.Position        = UDim2.new(0, 2, 0.5, -7)
+        knob.BackgroundColor3= C.gray
+        knob.BorderSizePixel = 0
+        Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
+
+        local function sv()
+            local on = cfg[cfgKey]
+            TweenService:Create(track, TweenInfo.new(0.18), {BackgroundColor3 = on and C.purple or C.bg3}):Play()
+            TweenService:Create(tStroke, TweenInfo.new(0.18), {Color = on and C.purpleL or C.gray}):Play()
+            TweenService:Create(knob, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+                Position = on and UDim2.new(1,-16,0.5,-7) or UDim2.new(0,2,0.5,-7),
+                BackgroundColor3 = on and C.orangeL or C.gray,
+            }):Play()
+            lbl.TextColor3 = on and C.white or C.gray
+        end
+        sv()
+
+        local btn = Instance.new("TextButton", cell)
+        btn.Size = UDim2.new(1,0,1,0)
+        btn.BackgroundTransparency = 1
+        btn.Text = ""
+        btn.MouseButton1Click:Connect(function()
+            cfg[cfgKey] = not cfg[cfgKey]; sv()
+            if sideEffect then sideEffect() end
+        end)
+    end
+end
+
+-- Slider row — returns nothing, drag updates cfg live
+local function addSlider(panel, label, cfgKey, mn, mx, suffix, transform, reverseTransform)
+    local row = Instance.new("Frame", panel)
+    row.Size            = UDim2.new(1, 0, 0, 52)
+    row.BackgroundColor3= C.bg2
+    row.BorderSizePixel = 0
+    row.LayoutOrder     = nextOrder()
+    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 7)
+
+    local displayVal = reverseTransform and reverseTransform(cfg[cfgKey]) or cfg[cfgKey]
+
+    local nameLbl = Instance.new("TextLabel", row)
+    nameLbl.Size                = UDim2.new(0.65, 0, 0, 20)
+    nameLbl.Position            = UDim2.new(0, 10, 0, 6)
+    nameLbl.BackgroundTransparency = 1
+    nameLbl.Font                = Enum.Font.Gotham
+    nameLbl.TextSize            = 12
+    nameLbl.TextColor3          = C.gray
+    nameLbl.TextXAlignment      = Enum.TextXAlignment.Left
+    nameLbl.Text                = label
+
+    local valLbl = Instance.new("TextLabel", row)
+    valLbl.Size                = UDim2.new(0.32, 0, 0, 20)
+    valLbl.Position            = UDim2.new(0.68, 0, 0, 6)
+    valLbl.BackgroundTransparency = 1
+    valLbl.Font                = Enum.Font.GothamBold
+    valLbl.TextSize            = 12
+    valLbl.TextColor3          = C.orange
+    valLbl.TextXAlignment      = Enum.TextXAlignment.Right
+    valLbl.Text                = tostring(math.floor(displayVal)) .. (suffix or "")
+
+    -- Track
+    local track = Instance.new("Frame", row)
+    track.Size            = UDim2.new(1, -20, 0, 6)
+    track.Position        = UDim2.new(0, 10, 0, 34)
+    track.BackgroundColor3= C.bg3
+    track.BorderSizePixel = 0
+    Instance.new("UICorner", track).CornerRadius = UDim.new(1, 0)
+
+    -- Fill
+    local pct0 = math.clamp((displayVal - mn) / (mx - mn), 0, 1)
+    local fill = Instance.new("Frame", track)
+    fill.Size            = UDim2.new(pct0, 0, 1, 0)
+    fill.BackgroundColor3= C.purple
+    fill.BorderSizePixel = 0
+    Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
+
+    local fillGrad = Instance.new("UIGradient", fill)
+    fillGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, C.purple),
+        ColorSequenceKeypoint.new(1, C.orange),
     })
-    mD("Square", {
-        Visible=true, Position=Vector2.new(x, y+16),
-        Size=Vector2.new(w, 7), Color=COL.bg3,
-        Filled=true, Thickness=0,
-    })
-    mD("Square", {
-        Visible=true, Position=Vector2.new(x, y+16),
-        Size=Vector2.new(w * pct, 7), Color=COL.accent,
-        Filled=true, Thickness=0,
-    })
+
     -- Knob
-    mD("Square", {
-        Visible=true,
-        Position=Vector2.new(x + w*pct - 4, y+13),
-        Size=Vector2.new(8, 13), Color=COL.white,
-        Filled=true, Thickness=0,
-    })
-end
+    local knob = Instance.new("Frame", track)
+    knob.Size            = UDim2.new(0, 14, 0, 14)
+    knob.Position        = UDim2.new(pct0, -7, 0.5, -7)
+    knob.BackgroundColor3= C.white
+    knob.BorderSizePixel = 0
+    Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
 
-local sliderAreas = {}  -- { x, y, w, min, max, cfgKey }
+    local knobStroke = Instance.new("UIStroke", knob)
+    knobStroke.Color     = C.orange
+    knobStroke.Thickness = 1.5
 
-local function regSlider(x, y, w, mn, mx, key)
-    sliderAreas[#sliderAreas+1] = {x=x, y=y, w=w, min=mn, max=mx, key=key}
-end
+    -- Interaction
+    local sliding = false
 
--- Toggle config keys per tab, in order matching drawToggle calls
-local tabToggles = {
-    -- COMBAT
-    { "aimbot","silent_aim","killaura","hitbox","esp"},
-    -- VISUAL
-    { "esp","esp_boxes","esp_names","esp_health","esp_tracers","ghost","tracker","fov_change"},
-    -- MOVEMENT
-    { "speed","bhop","noclip","mevlana","antiafk"},
-    -- EXTRAS (keybinds display only)
-    {},
-}
+    local function updateFromX(absX)
+        local abs   = track.AbsolutePosition
+        local sz    = track.AbsoluteSize
+        local pct   = math.clamp((absX - abs.X) / sz.X, 0, 1)
+        local rawV  = mn + (mx - mn) * pct
+        local dispV = math.floor(rawV)
 
-local function menuRender()
-    menuClear()
-    toggleAreas = {}
-    sliderAreas = {}
-    if not menu.open then return end
+        fill.Size     = UDim2.new(pct, 0, 1, 0)
+        knob.Position = UDim2.new(pct, -7, 0.5, -7)
+        valLbl.Text   = tostring(dispV) .. (suffix or "")
 
-    local X, Y, W, H = menu.x, menu.y, menu.w, menu.h
-
-    -- Shadow
-    mD("Square", {Visible=true, Position=Vector2.new(X+4,Y+4),
-        Size=Vector2.new(W,H), Color=Color3.new(0,0,0),
-        Filled=true, Thickness=0, Transparency=0.45})
-
-    -- Body
-    mD("Square", {Visible=true, Position=Vector2.new(X,Y),
-        Size=Vector2.new(W,H), Color=COL.bg1, Filled=true, Thickness=0})
-
-    -- Outer border
-    mD("Square", {Visible=true, Position=Vector2.new(X,Y),
-        Size=Vector2.new(W,H), Color=COL.accent, Filled=false, Thickness=1.5})
-
-    -- Header
-    mD("Square", {Visible=true, Position=Vector2.new(X,Y),
-        Size=Vector2.new(W,34), Color=COL.bg2, Filled=true, Thickness=0})
-    mD("Square", {Visible=true, Position=Vector2.new(X,Y+34),
-        Size=Vector2.new(W,2), Color=COL.accent, Filled=true, Thickness=0})
-
-    -- Title
-    mD("Text", {Visible=true, Text="▶ RAZE v1.0",
-        Position=Vector2.new(X+12, Y+9), Size=18,
-        Color=COL.accent, Outline=true})
-    mD("Text", {Visible=true, Text="INSERT = toggle  |  F1–F6 = hotkeys",
-        Position=Vector2.new(X+W-228, Y+11), Size=11,
-        Color=COL.gray, Outline=false})
-
-    -- Tabs
-    local tabW = W / #menu.tabs
-    for i, name in ipairs(menu.tabs) do
-        local tx    = X + (i-1)*tabW
-        local activ = menu.tab == i
-        mD("Square", {Visible=true, Position=Vector2.new(tx,Y+36),
-            Size=Vector2.new(tabW,28), Color=activ and COL.bg3 or COL.bg2,
-            Filled=true, Thickness=0})
-        if activ then
-            mD("Square", {Visible=true, Position=Vector2.new(tx,Y+64),
-                Size=Vector2.new(tabW,2), Color=COL.accent,
-                Filled=true, Thickness=0})
+        if transform then
+            cfg[cfgKey] = transform(rawV)
+        else
+            cfg[cfgKey] = dispV
         end
-        mD("Text", {Visible=true, Text=name,
-            Position=Vector2.new(tx + tabW*0.5 - #name*3.8, Y+44),
-            Size=13, Color=activ and COL.white or COL.gray, Outline=true})
     end
 
-    local cy  = Y + 74
-    local cx  = X + 12
-    local cx2 = X + W*0.5 + 8
+    local trackBtn = Instance.new("TextButton", track)
+    trackBtn.Size               = UDim2.new(1, 0, 3, -6)
+    trackBtn.Position           = UDim2.new(0, 0, 0, -8)
+    trackBtn.BackgroundTransparency = 1
+    trackBtn.Text               = ""
 
-    -- ──── COMBAT ────
-    if menu.tab == 1 then
-        drawToggle("Aimbot  [RMB]", cfg.aimbot, cx, cy)
-        drawToggle("Silent Aim", cfg.silent_aim, cx2, cy);  cy = cy + 28
-        drawToggle("Kill Aura", cfg.killaura, cx, cy)
-        drawToggle("Hitbox Expander", cfg.hitbox, cx2, cy); cy = cy + 34
+    trackBtn.MouseButton1Down:Connect(function(x, _)
+        sliding = true
+        TweenService:Create(knob, TweenInfo.new(0.08), {
+            Size = UDim2.new(0, 18, 0, 18),
+            Position = UDim2.new(knob.Position.X.Scale, -9, 0.5, -9),
+        }):Play()
+        updateFromX(x)
+    end)
 
-        drawSlider("Aimbot FOV", cfg.aim_fov, 20, 300, cx, cy, 220)
-        regSlider(cx, cy+16, 220, 20, 300, "aim_fov");     cy = cy + 38
-
-        drawSlider("Aim Smoothing %", (1-cfg.aim_smooth)*100, 0, 100, cx, cy, 220)
-        -- smoothing stored inverted; slider just shows value
-        regSlider(cx, cy+16, 220, 0, 100, "_aim_smooth");  cy = cy + 38
-
-        drawSlider("Kill Aura Radius", cfg.aura_radius, 5, 60, cx, cy, 220)
-        regSlider(cx, cy+16, 220, 5, 60, "aura_radius");   cy = cy + 38
-
-        drawSlider("Kill Aura Damage", cfg.aura_dmg, 5, 100, cx, cy, 220)
-        regSlider(cx, cy+16, 220, 5, 100, "aura_dmg");     cy = cy + 38
-
-        mD("Text", {Visible=true,
-            Text="Bone: " .. cfg.aim_bone .. "   (click to swap)",
-            Position=Vector2.new(cx, cy), Size=12,
-            Color=COL.white, Outline=true})
-
-    -- ──── VISUAL ────
-    elseif menu.tab == 2 then
-        drawToggle("ESP Master", cfg.esp, cx, cy)
-        drawToggle("ESP Boxes", cfg.esp_boxes, cx2, cy);    cy = cy + 28
-        drawToggle("ESP Names", cfg.esp_names, cx, cy)
-        drawToggle("ESP Health Bars", cfg.esp_health, cx2, cy); cy = cy + 28
-        drawToggle("ESP Tracers", cfg.esp_tracers, cx, cy)
-        drawToggle("Ghost Mode", cfg.ghost, cx2, cy);       cy = cy + 28
-        drawToggle("Player Tracker", cfg.tracker, cx, cy)
-        drawToggle("FOV Changer", cfg.fov_change, cx2, cy); cy = cy + 34
-
-        drawSlider("Field of View", cfg.fov_val, 30, 150, cx, cy, 220)
-        regSlider(cx, cy+16, 220, 30, 150, "fov_val");     cy = cy + 38
-
-        drawSlider("Ghost Alpha %", cfg.ghost_alpha*100, 0, 95, cx, cy, 220)
-        regSlider(cx, cy+16, 220, 0, 95, "_ghost_alpha");  cy = cy + 38
-
-        drawSlider("Hitbox Size", cfg.hitbox_sz, 2, 20, cx, cy, 220)
-        regSlider(cx, cy+16, 220, 2, 20, "hitbox_sz")
-
-    -- ──── MOVEMENT ────
-    elseif menu.tab == 3 then
-        drawToggle("Speed Hack", cfg.speed, cx, cy)
-        drawToggle("Bhop", cfg.bhop, cx2, cy);              cy = cy + 28
-        drawToggle("Noclip", cfg.noclip, cx, cy)
-        drawToggle("Mevlana Hilesi ∞", cfg.mevlana, cx2, cy); cy = cy + 28
-        drawToggle("Anti-AFK", cfg.antiafk, cx, cy);        cy = cy + 34
-
-        drawSlider("Walk Speed", cfg.speed_val, 16, 250, cx, cy, 220)
-        regSlider(cx, cy+16, 220, 16, 250, "speed_val");   cy = cy + 38
-
-        drawSlider("Mevlana RPM", cfg.mevlana_spd, 5, 300, cx, cy, 220)
-        regSlider(cx, cy+16, 220, 5, 300, "mevlana_spd")
-
-    -- ──── EXTRAS / KEYBINDS ────
-    elseif menu.tab == 4 then
-        mD("Text", {Visible=true, Text="KEYBIND REFERENCE",
-            Position=Vector2.new(cx, cy), Size=14,
-            Color=COL.accent, Outline=true}); cy = cy + 22
-
-        local binds = {
-            {"INSERT",  "Open / Close Menu"},
-            {"F1",      "Toggle ESP"},
-            {"F2",      "Toggle Aimbot"},
-            {"F3",      "Toggle Speed Hack"},
-            {"F4",      "Toggle Mevlana Hilesi"},
-            {"F5",      "Toggle Noclip"},
-            {"F6",      "Toggle Kill Aura"},
-            {"RMB",     "Aim (hold)"},
-        }
-        for _, b in ipairs(binds) do
-            mD("Square", {Visible=true, Position=Vector2.new(cx, cy),
-                Size=Vector2.new(W-24, 20), Color=COL.bg2,
-                Filled=true, Thickness=0})
-            mD("Text", {Visible=true,
-                Text=("[%-8s] %s"):format(b[1], b[2]),
-                Position=Vector2.new(cx+6, cy+3),
-                Size=13, Color=COL.white, Outline=true})
-            cy = cy + 24
+    UserInputService.InputChanged:Connect(function(inp)
+        if sliding and inp.UserInputType == Enum.UserInputType.MouseMovement then
+            updateFromX(inp.Position.X)
         end
+    end)
 
-        cy = cy + 10
-        mD("Text", {Visible=true,
-            Text="RAZE  |  one tap or no tap  |  bench cooked this",
-            Position=Vector2.new(cx, cy), Size=11,
-            Color=COL.gray, Outline=false})
+    UserInputService.InputEnded:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.MouseButton1 and sliding then
+            sliding = false
+            TweenService:Create(knob, TweenInfo.new(0.08), {
+                Size = UDim2.new(0, 14, 0, 14),
+                Position = UDim2.new(knob.Position.X.Scale, -7, 0.5, -7),
+            }):Play()
+        end
+    end)
+end
+
+-- Info / keybind row
+local function addInfoRow(panel, key, desc)
+    local row = Instance.new("Frame", panel)
+    row.Size            = UDim2.new(1, 0, 0, 26)
+    row.BackgroundColor3= C.bg2
+    row.BorderSizePixel = 0
+    row.LayoutOrder     = nextOrder()
+    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 6)
+
+    local badge = Instance.new("Frame", row)
+    badge.Size            = UDim2.new(0, 56, 0, 18)
+    badge.Position        = UDim2.new(0, 8, 0.5, -9)
+    badge.BackgroundColor3= C.purple
+    badge.BorderSizePixel = 0
+    Instance.new("UICorner", badge).CornerRadius = UDim.new(0, 4)
+
+    local badgeLbl = Instance.new("TextLabel", badge)
+    badgeLbl.Size                = UDim2.new(1, 0, 1, 0)
+    badgeLbl.BackgroundTransparency = 1
+    badgeLbl.Font                = Enum.Font.GothamBold
+    badgeLbl.TextSize            = 11
+    badgeLbl.TextColor3          = C.white
+    badgeLbl.Text                = key
+
+    local descLbl = Instance.new("TextLabel", row)
+    descLbl.Size                = UDim2.new(1, -80, 1, 0)
+    descLbl.Position            = UDim2.new(0, 72, 0, 0)
+    descLbl.BackgroundTransparency = 1
+    descLbl.Font                = Enum.Font.Gotham
+    descLbl.TextSize            = 12
+    descLbl.TextColor3          = C.gray
+    descLbl.TextXAlignment      = Enum.TextXAlignment.Left
+    descLbl.Text                = desc
+end
+
+-- Bone-swap button
+local function addBoneSwap(panel)
+    local row = Instance.new("Frame", panel)
+    row.Size            = UDim2.new(1, 0, 0, 34)
+    row.BackgroundColor3= C.bg2
+    row.BorderSizePixel = 0
+    row.LayoutOrder     = nextOrder()
+    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 7)
+
+    local stroke = Instance.new("UIStroke", row)
+    stroke.Color     = C.purple
+    stroke.Thickness = 1
+    stroke.Transparency = 0.5
+
+    local lbl = Instance.new("TextLabel", row)
+    lbl.Size                = UDim2.new(0.6, 0, 1, 0)
+    lbl.Position            = UDim2.new(0, 12, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Font                = Enum.Font.Gotham
+    lbl.TextSize            = 13
+    lbl.TextColor3          = C.gray
+    lbl.TextXAlignment      = Enum.TextXAlignment.Left
+    lbl.Text                = "Aim Bone"
+
+    local valBtn = Instance.new("TextButton", row)
+    valBtn.Size            = UDim2.new(0, 140, 0, 24)
+    valBtn.Position        = UDim2.new(1, -150, 0.5, -12)
+    valBtn.BackgroundColor3= C.purple
+    valBtn.BorderSizePixel = 0
+    valBtn.Font            = Enum.Font.GothamBold
+    valBtn.TextSize        = 12
+    valBtn.TextColor3      = C.white
+    valBtn.Text            = "◈  " .. cfg.aim_bone
+    Instance.new("UICorner", valBtn).CornerRadius = UDim.new(0, 6)
+
+    valBtn.MouseButton1Click:Connect(function()
+        cfg.aim_bone = cfg.aim_bone == "Head" and "HumanoidRootPart" or "Head"
+        TweenService:Create(valBtn, TweenInfo.new(0.1), {
+            BackgroundColor3 = C.orange,
+        }):Play()
+        task.delay(0.15, function()
+            TweenService:Create(valBtn, TweenInfo.new(0.15), {
+                BackgroundColor3 = C.purple,
+            }):Play()
+        end)
+        valBtn.Text = "◈  " .. cfg.aim_bone
+    end)
+end
+
+-- ══════════════════════════════════════════════
+--  BUILD PANELS
+-- ══════════════════════════════════════════════
+
+local panels = {}
+for i, name in ipairs(TAB_NAMES) do
+    panels[i] = makePanel()
+end
+
+-- ── PANEL 1: COMBAT ────────────────────────────
+do
+    local p = panels[1]
+    addSection(p, "AIMBOT")
+    addToggle2Col(p, "Aimbot  [RMB]", "aimbot")
+    addToggle2Col(p, "Silent Aim",    "silent_aim")
+    addBoneSwap(p)
+    addSlider(p, "Aimbot FOV", "aim_fov", 20, 300, "px")
+    addSlider(p, "Smoothing", "aim_smooth", 0, 100, "%",
+        function(v) return 1 - v/100 end,
+        function(v) return (1-v)*100 end)
+
+    addSection(p, "AURA")
+    addToggle2Col(p, "Kill Aura",       "killaura")
+    addToggle2Col(p, "Hitbox Expander", "hitbox",
+        function() hitboxApply() end)
+    addSlider(p, "Aura Radius",  "aura_radius", 5, 60,  "u")
+    addSlider(p, "Aura Damage",  "aura_dmg",   5, 100, "hp")
+    addSlider(p, "Hitbox Size",  "hitbox_sz",  2, 20,  "u")
+end
+
+-- ── PANEL 2: VISUAL ────────────────────────────
+do
+    local p = panels[2]
+    addSection(p, "ESP")
+    addToggle2Col(p, "ESP Master",    "esp")
+    addToggle2Col(p, "ESP Boxes",     "esp_boxes")
+    addToggle2Col(p, "ESP Names",     "esp_names")
+    addToggle2Col(p, "ESP Health",    "esp_health")
+    addToggle2Col(p, "ESP Tracers",   "esp_tracers")
+
+    addSection(p, "MISC VISUAL")
+    addToggle2Col(p, "Ghost Mode",    "ghost")
+    addToggle2Col(p, "Player Tracker","tracker")
+    addToggle2Col(p, "FOV Changer",   "fov_change",
+        function() fovApply() end)
+    addSlider(p, "Field of View",  "fov_val",     30, 150, "°")
+    addSlider(p, "Ghost Alpha",    "ghost_alpha",  0, 95, "%",
+        function(v) return v/100 end,
+        function(v) return v*100 end)
+end
+
+-- ── PANEL 3: MOVEMENT ──────────────────────────
+do
+    local p = panels[3]
+    addSection(p, "MOVEMENT")
+    addToggle2Col(p, "Speed Hack",       "speed",
+        function() speedApply() end)
+    addToggle2Col(p, "Bhop",             "bhop",
+        function() bhopToggle() end)
+    addToggle2Col(p, "Noclip",           "noclip",
+        function() noclipToggle() end)
+    addToggle2Col(p, "Mevlana Hilesi ∞", "mevlana",
+        function() mevlanaToggle() end)
+    addToggle(p,    "Anti-AFK",          "antiafk",
+        function() afkToggle() end)
+    addSlider(p, "Walk Speed",   "speed_val",   16, 250, "u")
+    addSlider(p, "Mevlana RPM", "mevlana_spd",  5, 300, "°/s")
+end
+
+-- ── PANEL 4: EXTRAS / KEYBINDS ─────────────────
+do
+    local p = panels[4]
+    addSection(p, "KEYBIND REFERENCE")
+
+    local binds = {
+        {"INSERT", "Open / Close Menu"},
+        {"F1",     "Toggle ESP"},
+        {"F2",     "Toggle Aimbot"},
+        {"F3",     "Toggle Speed Hack"},
+        {"F4",     "Toggle Mevlana Hilesi"},
+        {"F5",     "Toggle Noclip"},
+        {"F6",     "Toggle Kill Aura"},
+        {"RMB",    "Hold to Aim"},
+    }
+    for _, b in ipairs(binds) do
+        addInfoRow(p, b[1], b[2])
     end
 
-    -- Footer line
-    mD("Square", {Visible=true, Position=Vector2.new(X, Y+H-22),
-        Size=Vector2.new(W,1), Color=COL.accent,
-        Filled=true, Thickness=0})
-    mD("Square", {Visible=true, Position=Vector2.new(X, Y+H-21),
-        Size=Vector2.new(W,21), Color=COL.bg2,
-        Filled=true, Thickness=0})
-    mD("Text", {Visible=true,
-        Text="RAZE v1.0  |  ESP · Aimbot · Speed · Mevlana · KillAura · Ghost · Hitbox · Silent · Bhop · Noclip · AFK · FOV · Map",
-        Position=Vector2.new(X+8, Y+H-15),
-        Size=10, Color=COL.gray, Outline=false})
+    -- Credits
+    local gap = Instance.new("Frame", p)
+    gap.Size            = UDim2.new(1, 0, 0, 8)
+    gap.BackgroundTransparency = 1
+    gap.LayoutOrder     = nextOrder()
+
+    local creditRow = Instance.new("Frame", p)
+    creditRow.Size            = UDim2.new(1, 0, 0, 30)
+    creditRow.BackgroundColor3= C.bg2
+    creditRow.BorderSizePixel = 0
+    creditRow.LayoutOrder     = nextOrder()
+    Instance.new("UICorner", creditRow).CornerRadius = UDim.new(0, 7)
+
+    local creditGrad = Instance.new("UIStroke", creditRow)
+    creditGrad.Color     = C.orange
+    creditGrad.Thickness = 1
+    creditGrad.Transparency = 0.5
+
+    local creditLbl = Instance.new("TextLabel", creditRow)
+    creditLbl.Size                = UDim2.new(1, 0, 1, 0)
+    creditLbl.BackgroundTransparency = 1
+    creditLbl.Font                = Enum.Font.GothamItalic
+    creditLbl.TextSize            = 12
+    creditLbl.TextColor3          = C.orange
+    creditLbl.Text                = "RAZE v1.0  —  one tap or no tap  —  bench cooked this"
 end
 
 -- ══════════════════════════════════════════════
---  WATERMARK HUD
+--  TAB BUTTONS + SWITCHING
 -- ══════════════════════════════════════════════
 
-local wmDraws  = {}
-local fpsSmooth = 60
+local activeTab = 1
+local tabBtns   = {}
 
-local function wmClear()
-    for _, d in ipairs(wmDraws) do d:Remove() end
-    wmDraws = {}
-end
+local function switchTab(i)
+    activeTab = i
+    -- Slide indicator
+    TweenService:Create(tabIndicator, TweenInfo.new(0.22, Enum.EasingStyle.Quad), {
+        Position = UDim2.new((i-1) / #TAB_NAMES, 1, 1, -2),
+    }):Play()
 
-local function wmRender(fps)
-    wmClear()
-    local function W(t, p)
-        local d = Drawing.new(t)
-        for k,v in pairs(p) do d[k]=v end
-        wmDraws[#wmDraws+1] = d
+    for idx, btn in ipairs(tabBtns) do
+        local active = idx == i
+        TweenService:Create(btn, TweenInfo.new(0.15), {
+            BackgroundColor3 = active and C.bg3 or C.bg1,
+        }):Play()
+        btn.TextColor3 = active and C.white or C.gray
     end
-    W("Square", {Visible=true, Position=Vector2.new(5,5),
-        Size=Vector2.new(270,22), Color=COL.bg1,
-        Filled=true, Thickness=0})
-    W("Square", {Visible=true, Position=Vector2.new(5,5),
-        Size=Vector2.new(270,22), Color=COL.accent,
-        Filled=false, Thickness=1.4})
-    W("Text", {Visible=true,
-        Text=("RAZE  |  %s  |  %d fps"):format(lp.Name, math.floor(fps)),
-        Position=Vector2.new(10,9), Size=12,
-        Color=COL.white, Outline=true})
+
+    for idx, pan in ipairs(panels) do
+        if idx == i then
+            pan.Visible = true
+            pan.Position = UDim2.new(0.05, 0, 0, 0)
+            pan.BackgroundTransparency = 1
+            TweenService:Create(pan, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                Position = UDim2.new(0, 0, 0, 0),
+            }):Play()
+        else
+            pan.Visible = false
+        end
+    end
+end
+
+for i, name in ipairs(TAB_NAMES) do
+    local btn = Instance.new("TextButton", tabBar)
+    btn.Size            = UDim2.new(1/#TAB_NAMES, -1, 1, 0)
+    btn.BackgroundColor3= i == 1 and C.bg3 or C.bg1
+    btn.BorderSizePixel = 0
+    btn.Font            = Enum.Font.GothamBold
+    btn.TextSize        = 12
+    btn.TextColor3      = i == 1 and C.white or C.gray
+    btn.Text            = name
+    btn.LayoutOrder     = i
+
+    btn.MouseButton1Click:Connect(function()
+        switchTab(i)
+    end)
+
+    tabBtns[i] = btn
+end
+
+switchTab(1)
+
+-- ══════════════════════════════════════════════
+--  MENU OPEN / CLOSE (INSERT key)
+-- ══════════════════════════════════════════════
+
+local menuOpen = false
+
+local function setMenu(open)
+    menuOpen = open
+    if open then
+        root.Visible = true
+        root.BackgroundTransparency = 1
+        TweenService:Create(root, TweenInfo.new(0.22, Enum.EasingStyle.Quad), {
+            BackgroundTransparency = 0,
+        }):Play()
+        -- Pop in scale effect via Position shift
+        root.Position = UDim2.new(
+            root.Position.X.Scale, root.Position.X.Offset,
+            root.Position.Y.Scale, root.Position.Y.Offset + 8)
+        TweenService:Create(root, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+            Position = UDim2.new(
+                root.Position.X.Scale, root.Position.X.Offset,
+                root.Position.Y.Scale, root.Position.Y.Offset - 8),
+        }):Play()
+    else
+        TweenService:Create(root, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {
+            BackgroundTransparency = 1,
+        }):Play()
+        task.delay(0.16, function() root.Visible = false end)
+    end
 end
 
 -- ══════════════════════════════════════════════
---  INPUT — MENU TOGGLE + HOTKEYS + CLICKS
+--  SIDE EFFECT HELPER (same as before)
 -- ══════════════════════════════════════════════
 
 local function applyToggleSideEffects(key)
-    if key == "speed"    then speedApply()    end
-    if key == "bhop"     then bhopToggle()    end
-    if key == "noclip"   then noclipToggle()  end
-    if key == "mevlana"  then mevlanaToggle() end
-    if key == "antiafk"  then afkToggle()     end
-    if key == "fov_change" then fovApply()    end
+    if key == "speed"      then speedApply()    end
+    if key == "bhop"       then bhopToggle()    end
+    if key == "noclip"     then noclipToggle()  end
+    if key == "mevlana"    then mevlanaToggle() end
+    if key == "antiafk"    then afkToggle()     end
+    if key == "fov_change" then fovApply()      end
 end
 
+-- ══════════════════════════════════════════════
+--  INPUT — INSERT + F1–F6
+-- ══════════════════════════════════════════════
+
 UserInputService.InputBegan:Connect(function(inp, gpe)
-    -- Hard keybinds
     if inp.KeyCode == Enum.KeyCode.Insert then
-        menu.open = not menu.open
-        menuRender()
+        setMenu(not menuOpen)
         return
     end
     if inp.KeyCode == Enum.KeyCode.F1 then
-        cfg.esp = not cfg.esp; menuRender()
+        cfg.esp     = not cfg.esp
     elseif inp.KeyCode == Enum.KeyCode.F2 then
-        cfg.aimbot = not cfg.aimbot; menuRender()
+        cfg.aimbot  = not cfg.aimbot
     elseif inp.KeyCode == Enum.KeyCode.F3 then
-        cfg.speed = not cfg.speed; speedApply(); menuRender()
+        cfg.speed   = not cfg.speed;   speedApply()
     elseif inp.KeyCode == Enum.KeyCode.F4 then
-        cfg.mevlana = not cfg.mevlana; mevlanaToggle(); menuRender()
+        cfg.mevlana = not cfg.mevlana; mevlanaToggle()
     elseif inp.KeyCode == Enum.KeyCode.F5 then
-        cfg.noclip = not cfg.noclip; noclipToggle(); menuRender()
+        cfg.noclip  = not cfg.noclip;  noclipToggle()
     elseif inp.KeyCode == Enum.KeyCode.F6 then
-        cfg.killaura = not cfg.killaura; menuRender()
-    end
-
-    if not menu.open then return end
-
-    if inp.UserInputType == Enum.UserInputType.MouseButton1 then
-        local mx, my = inp.Position.X, inp.Position.Y
-
-        -- Drag (header)
-        if mx >= menu.x and mx <= menu.x+menu.w
-           and my >= menu.y and my <= menu.y+34 then
-            isDrag     = true
-            dragSX     = mx; dragSY = my
-            menuStartX = menu.x; menuStartY = menu.y
-            return
-        end
-
-        -- Tab click
-        local tabW = menu.w / #menu.tabs
-        if my >= menu.y+36 and my <= menu.y+64 then
-            for i = 1, #menu.tabs do
-                local tx = menu.x + (i-1)*tabW
-                if mx >= tx and mx <= tx+tabW then
-                    menu.tab = i
-                    menuRender()
-                    return
-                end
-            end
-        end
-
-        -- Bone swap text click (combat tab, last row)
-        if menu.tab == 1 then
-            local boneY = menu.y + 74 + 28 + 34 + 38*4
-            if mx >= menu.x+12 and mx <= menu.x+menu.w-12
-               and my >= boneY and my <= boneY+16 then
-                cfg.aim_bone = cfg.aim_bone == "Head" and "HumanoidRootPart" or "Head"
-                menuRender()
-                return
-            end
-        end
-
-        -- Toggle clicks
-        local tabKeys   = tabToggles[menu.tab]
-        local toggleIdx = 0
-        for _, area in ipairs(toggleAreas) do
-            toggleIdx = toggleIdx + 1
-            local k = tabKeys[toggleIdx]
-            if k and mx >= area.x and mx <= area.x+area.w
-               and my >= area.y and my <= area.y+area.h then
-                cfg[k] = not cfg[k]
-                applyToggleSideEffects(k)
-                menuRender()
-                return
-            end
-        end
-
-        -- Slider clicks
-        for _, sl in ipairs(sliderAreas) do
-            if mx >= sl.x and mx <= sl.x+sl.w
-               and my >= sl.y and my <= sl.y+7 then
-                local pct = (mx - sl.x) / sl.w
-                local val = sl.min + (sl.max - sl.min) * pct
-
-                if sl.key == "_aim_smooth" then
-                    cfg.aim_smooth = 1 - (val / 100)
-                elseif sl.key == "_ghost_alpha" then
-                    cfg.ghost_alpha = val / 100
-                else
-                    cfg[sl.key] = math.floor(val)
-                    applyToggleSideEffects(sl.key)
-                end
-                menuRender()
-                return
-            end
-        end
-    end
-end)
-
-UserInputService.InputChanged:Connect(function(inp)
-    if isDrag and inp.UserInputType == Enum.UserInputType.MouseMovement then
-        menu.x = menuStartX + (inp.Position.X - dragSX)
-        menu.y = menuStartY + (inp.Position.Y - dragSY)
-        menuRender()
-    end
-end)
-
-UserInputService.InputEnded:Connect(function(inp)
-    if inp.UserInputType == Enum.UserInputType.MouseButton1 then
-        isDrag = false
+        cfg.killaura = not cfg.killaura
     end
 end)
 
@@ -970,8 +1403,8 @@ end)
 local function hookPlayer(p)
     p.CharacterAdded:Connect(function()
         task.wait(0.5)
-        if cfg.hitbox  then hitboxApply() end
-        if cfg.ghost   then ghostApply()  end
+        if cfg.hitbox then hitboxApply() end
+        if cfg.ghost  then ghostApply()  end
     end)
 end
 
@@ -985,43 +1418,30 @@ Players.PlayerRemoving:Connect(function(p) espRemove(p) end)
 --  MAIN LOOP
 -- ══════════════════════════════════════════════
 
-local frames   = 0
-local lastFPS  = tick()
-local smoothFPS= 60
+local frames    = 0
+local smoothFPS = 60
 
 RunService.Heartbeat:Connect(function(dt)
-    frames = frames + 1
-
-    -- FPS
+    frames    = frames + 1
     smoothFPS = smoothFPS + (1/dt - smoothFPS) * 0.05
 
-    -- ESP
     espUpdate()
-
-    -- Aimbot + FOV circle
     aimbotUpdate()
-
-    -- Kill aura
     killAuraUpdate()
 
-    -- Speed maintenance
     if cfg.speed then speedApply() end
 
-    -- Ghost + hitbox (not every frame, expensive)
     if frames % 8 == 0 then
         if cfg.ghost  then ghostApply()  end
         if cfg.hitbox then hitboxApply() end
         fovApply()
     end
 
-    -- Tracker (minimap)
-    if frames % 4 == 0 then
-        trackerUpdate()
-    end
+    if frames % 4  == 0 then trackerUpdate() end
 
-    -- Watermark FPS update every 30 frames
     if frames % 30 == 0 then
-        wmRender(smoothFPS)
+        wmLabel.Text = ("RAZE v1.0  |  %s  |  %d fps"):format(
+            lp.Name, math.floor(smoothFPS))
     end
 end)
 
@@ -1029,13 +1449,10 @@ end)
 --  INIT
 -- ══════════════════════════════════════════════
 
-wmRender(60)
-menuRender()
-
 StarterGui:SetCore("SendNotification", {
     Title    = "RAZE v1.0",
     Text     = "Loaded. INSERT = menu | F1-F6 hotkeys",
     Duration = 5,
 })
 
-print("RAZE v1.0 loaded clean — bench out")
+print("RAZE v1.0 loaded — new GUI, bench cooked clean")
