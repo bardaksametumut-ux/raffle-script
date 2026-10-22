@@ -1,28 +1,9 @@
 --[[
-  ██████╗  █████╗ ███████╗███████╗
-  ██╔══██╗██╔══██╗╚════██║██╔════╝
-  ██████╔╝███████║    ██╔╝█████╗
-  ██╔══██╗██╔══██║   ██╔╝ ██╔══╝
-  ██║  ██║██║  ██║  ███████╗███████╗
-  ╚═╝  ╚═╝╚═╝  ╚═╝  ╚══════╝╚══════╝
+  RAZE v1.0 — Xeno Build
+  INSERT = menu | F1–F6 hotkeys | RMB = aim
+]]
 
-  RAZE v1.0  |  Roblox One-Tap Suite
-  Runtime : Synapse X / KRNL / Fluxus / Electron
-  Language: Luau (executor environment)
-  Author  : your bench
-
-  Classic  : ESP · Aimbot (one-tap) · Speed
-  Extras   : Mevlana · Kill Aura · Ghost Mode
-             Hitbox Expander · Silent Aim · Bhop
-             Noclip · Anti-AFK · FOV Changer
-             Player Tracker (minimap)
-  Keybind  : INSERT = menu | F1–F6 = hotkeys
---]]
-
--- ══════════════════════════════════════════════
---  SERVICES
--- ══════════════════════════════════════════════
-
+-- ══ SERVICES ══
 local Players          = game:GetService("Players")
 local RunService       = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -31,16 +12,21 @@ local StarterGui       = game:GetService("StarterGui")
 local VirtualUser      = game:GetService("VirtualUser")
 local Workspace        = game:GetService("Workspace")
 
-local lp     = Players.LocalPlayer
-local cam    = Workspace.CurrentCamera
-local mouse  = lp:GetMouse()
+local lp    = Players.LocalPlayer
+local cam   = Workspace.CurrentCamera
+local mouse = lp:GetMouse()
 
--- ══════════════════════════════════════════════
---  CONFIG
--- ══════════════════════════════════════════════
+-- ══ XENO COMPAT — mousemoverel wrapper ══
+local function mmrel(x, y)
+    if mousemoverel then
+        mousemoverel(x, y)
+    elseif mouse_move then
+        mouse_move(x, y)
+    end
+end
 
+-- ══ CONFIG ══
 local cfg = {
-    -- ESP
     esp            = true,
     esp_boxes      = true,
     esp_names      = true,
@@ -49,61 +35,42 @@ local cfg = {
     esp_color      = Color3.fromRGB(230, 40, 55),
     esp_thickness  = 1.5,
 
-    -- Aimbot
     aimbot         = false,
     aim_fov        = 120,
-    aim_smooth     = 0.12,        -- 0 = snap, 1 = barely moves
-    aim_bone       = "Head",      -- "Head" | "HumanoidRootPart"
+    aim_smooth     = 0.12,
+    aim_bone       = "Head",
     aim_key        = Enum.UserInputType.MouseButton2,
     silent_aim     = false,
 
-    -- Speed
     speed          = false,
     speed_val      = 40,
 
-    -- [1] Mevlana Hilesi — rapid spin
     mevlana        = false,
-    mevlana_spd    = 60,          -- degrees per second
+    mevlana_spd    = 60,
 
-    -- [2] Kill Aura
     killaura       = false,
     aura_radius    = 18,
     aura_dmg       = 20,
-    aura_rate      = 0.12,        -- seconds between ticks
+    aura_rate      = 0.12,
 
-    -- [3] Ghost Mode
     ghost          = false,
     ghost_alpha    = 0.72,
 
-    -- [4] Hitbox Expander
     hitbox         = false,
     hitbox_sz      = 7,
 
-    -- [5] Silent Aim (handled in aim update; flag here)
-    -- (flag above: cfg.silent_aim)
-
-    -- [6] Bhop
     bhop           = false,
-
-    -- [7] Noclip
     noclip         = false,
-
-    -- [8] Anti-AFK
     antiafk        = false,
 
-    -- [9] FOV Changer
     fov_change     = false,
     fov_val        = 90,
 
-    -- [10] Player Tracker (minimap)
     tracker        = false,
 }
 
--- ══════════════════════════════════════════════
---  UTILITIES
--- ══════════════════════════════════════════════
-
-local function getChar(p)   return p and p.Character end
+-- ══ UTILS ══
+local function getChar(p)  return p and p.Character end
 local function getHRP(p)
     local c = getChar(p)
     return c and (c:FindFirstChild("HumanoidRootPart") or c:FindFirstChild("Torso"))
@@ -133,7 +100,7 @@ local function enemies()
 end
 local function closestToCenter(fov)
     local best, bestD = nil, fov
-    local mid = Vector2.new(cam.ViewportSize.X / 2, cam.ViewportSize.Y / 2)
+    local mid = Vector2.new(cam.ViewportSize.X/2, cam.ViewportSize.Y/2)
     for _, p in ipairs(enemies()) do
         local b = getBone(p, cfg.aim_bone)
         if b then
@@ -147,10 +114,7 @@ local function closestToCenter(fov)
     return best
 end
 
--- ══════════════════════════════════════════════
---  ESP
--- ══════════════════════════════════════════════
-
+-- ══ ESP ══
 local espPool = {}
 
 local function espInit(p)
@@ -162,11 +126,11 @@ local function espInit(p)
     end
     espPool[p] = {
         box    = D("Square", {Visible=false, Filled=false,
-                              Color=cfg.esp_color, Thickness=cfg.esp_thickness}),
-        name   = D("Text",   {Visible=false, Size=13, Color=Color3.new(1,1,1),
-                              Center=true, Outline=true}),
+                               Color=cfg.esp_color, Thickness=cfg.esp_thickness}),
+        name   = D("Text",   {Visible=false, Size=13,
+                               Color=Color3.new(1,1,1), Center=true, Outline=true}),
         hbg    = D("Square", {Visible=false, Filled=true,
-                              Color=Color3.fromRGB(10,10,10), Thickness=0}),
+                               Color=Color3.fromRGB(10,10,10), Thickness=0}),
         hbar   = D("Square", {Visible=false, Filled=true, Thickness=0}),
         tracer = D("Line",   {Visible=false, Color=cfg.esp_color, Thickness=1}),
     }
@@ -188,7 +152,6 @@ local function espUpdate()
             for _, d in pairs(ob) do d.Visible = false end
             continue
         end
-
         local c    = p.Character
         local root = c and c:FindFirstChild("HumanoidRootPart")
         local head = c and c:FindFirstChild("Head")
@@ -196,122 +159,94 @@ local function espUpdate()
             for _, d in pairs(ob) do d.Visible = false end
             continue
         end
-
-        local hTop = head.Position + Vector3.new(0, head.Size.Y * 0.5, 0)
-        local rSP,  rOK = w2v(root.Position)
-        local hSP,  hOK = w2v(hTop)
+        local hTop      = head.Position + Vector3.new(0, head.Size.Y*0.5, 0)
+        local rSP, rOK  = w2v(root.Position)
+        local hSP, hOK  = w2v(hTop)
         if not (rOK and hOK) then
             for _, d in pairs(ob) do d.Visible = false end
             continue
         end
-
         local h = math.abs(hSP.Y - rSP.Y) * 2.3
         local w = h * 0.55
-        local x = hSP.X - w * 0.5
-        local y = hSP.Y - h * 0.05
+        local x = hSP.X - w*0.5
+        local y = hSP.Y - h*0.05
 
-        -- Box
         ob.box.Visible  = cfg.esp_boxes
         ob.box.Position = Vector2.new(x, y)
         ob.box.Size     = Vector2.new(w, h)
         ob.box.Color    = cfg.esp_color
 
-        -- Name
-        ob.name.Visible   = cfg.esp_names
-        ob.name.Text      = p.Name
-        ob.name.Position  = Vector2.new(hSP.X, y - 16)
+        ob.name.Visible  = cfg.esp_names
+        ob.name.Text     = p.Name
+        ob.name.Position = Vector2.new(hSP.X, y-16)
 
-        -- Health bar
-        local hum  = getHum(p)
-        local pct  = hum and math.clamp(hum.Health / hum.MaxHealth, 0, 1) or 0
+        local hum = getHum(p)
+        local pct = hum and math.clamp(hum.Health/hum.MaxHealth, 0, 1) or 0
         local barH = h * pct
         ob.hbg.Visible  = cfg.esp_health
-        ob.hbg.Position = Vector2.new(x - 6, y)
+        ob.hbg.Position = Vector2.new(x-6, y)
         ob.hbg.Size     = Vector2.new(4, h)
         ob.hbar.Visible  = cfg.esp_health
-        ob.hbar.Position = Vector2.new(x - 6, y + (h - barH))
+        ob.hbar.Position = Vector2.new(x-6, y+(h-barH))
         ob.hbar.Size     = Vector2.new(4, barH)
         ob.hbar.Color    = Color3.fromRGB(
-            math.floor((1 - pct) * 255),
-            math.floor(pct * 210), 35)
+            math.floor((1-pct)*255),
+            math.floor(pct*210), 35)
 
-        -- Tracer
         local vp = cam.ViewportSize
         ob.tracer.Visible = cfg.esp_tracers
-        ob.tracer.From    = Vector2.new(vp.X * 0.5, vp.Y)
+        ob.tracer.From    = Vector2.new(vp.X*0.5, vp.Y)
         ob.tracer.To      = rSP
     end
 end
 
--- ══════════════════════════════════════════════
---  AIMBOT — ONE TAP (+ SILENT AIM)
--- ══════════════════════════════════════════════
-
--- FOV circle drawn once, updated every frame
+-- ══ AIMBOT ══
 local fovCircle = Drawing.new("Circle")
 fovCircle.Filled    = false
-fovCircle.Color     = Color3.fromRGB(255, 255, 255)
+fovCircle.Color     = Color3.fromRGB(255,255,255)
 fovCircle.Thickness = 1
 fovCircle.NumSides  = 64
 fovCircle.Visible   = false
 
 local function aimbotUpdate()
     local vp  = cam.ViewportSize
-    local mid = Vector2.new(vp.X * 0.5, vp.Y * 0.5)
-
+    local mid = Vector2.new(vp.X*0.5, vp.Y*0.5)
     fovCircle.Visible  = cfg.aimbot
     fovCircle.Position = mid
     fovCircle.Radius   = cfg.aim_fov
-
     if not cfg.aimbot then return end
     if not UserInputService:IsMouseButtonPressed(cfg.aim_key) then return end
-
     local target = closestToCenter(cfg.aim_fov)
     if not target then return end
-
     local b = getBone(target, cfg.aim_bone)
     if not b then return end
-
     if cfg.silent_aim then
-        -- Silent aim: raycast from camera toward bone on server hit detection
-        -- Override mouse position in the WorldToScreenPoint path via CFrame nudge
-        -- (executor-level: moves aim without cursor movement)
         local bSP, ok = w2v(b.Position)
         if ok then
-            -- Use mousemoverel for zero-visible-cursor movement targeting
             local cur = Vector2.new(mouse.X, mouse.Y)
             local off = bSP - cur
-            mousemoverel(off.X, off.Y)
+            mmrel(off.X, off.Y)
             task.wait()
-            mousemoverel(-off.X, -off.Y)
+            mmrel(-off.X, -off.Y)
         end
         return
     end
-
-    -- Smooth aimbot
     local bSP, ok = w2v(b.Position)
     if not ok then return end
     local cur   = Vector2.new(mouse.X, mouse.Y)
     local delta = (bSP - cur) * cfg.aim_smooth
-    mousemoverel(delta.X, delta.Y)
+    mmrel(delta.X, delta.Y)
 end
 
--- ══════════════════════════════════════════════
---  SPEED HACK
--- ══════════════════════════════════════════════
-
+-- ══ SPEED ══
 local function speedApply()
     local h = getHum(lp)
     if h then h.WalkSpeed = cfg.speed and cfg.speed_val or 16 end
 end
 
--- ══════════════════════════════════════════════
---  [1] MEVLANA HİLESİ — SPIN HACK
--- ══════════════════════════════════════════════
-
+-- ══ MEVLANA ══
 local mevlanaAngle = 0
 local mevlanaConn
-
 local function mevlanaToggle()
     if mevlanaConn then mevlanaConn:Disconnect(); mevlanaConn = nil end
     if not cfg.mevlana then return end
@@ -320,26 +255,20 @@ local function mevlanaToggle()
         local root = c and c:FindFirstChild("HumanoidRootPart")
         if not root then return end
         mevlanaAngle = mevlanaAngle + cfg.mevlana_spd * dt
-        -- Preserve Y position and apply spin on Y-axis
-        root.CFrame = CFrame.new(root.Position)
+        root.CFrame  = CFrame.new(root.Position)
             * CFrame.Angles(0, math.rad(mevlanaAngle), 0)
     end)
 end
 
--- ══════════════════════════════════════════════
---  [2] KILL AURA
--- ══════════════════════════════════════════════
-
+-- ══ KILL AURA ══
 local lastAura = 0
 local function killAuraUpdate()
     if not cfg.killaura then return end
     local now = tick()
     if now - lastAura < cfg.aura_rate then return end
     lastAura = now
-
     local selfRoot = getHRP(lp)
     if not selfRoot then return end
-
     for _, p in ipairs(enemies()) do
         local tr = getHRP(p)
         if tr and (selfRoot.Position - tr.Position).Magnitude <= cfg.aura_radius then
@@ -351,10 +280,7 @@ local function killAuraUpdate()
     end
 end
 
--- ══════════════════════════════════════════════
---  [3] GHOST MODE
--- ══════════════════════════════════════════════
-
+-- ══ GHOST ══
 local function ghostApply()
     local c = lp.Character
     if not c then return end
@@ -365,18 +291,14 @@ local function ghostApply()
     end
 end
 
--- ══════════════════════════════════════════════
---  [4] HİTBOX GENİŞLETİCİ
--- ══════════════════════════════════════════════
-
+-- ══ HİTBOX ══
 local function hitboxApply()
     for _, p in ipairs(Players:GetPlayers()) do
         if p == lp then continue end
-        local c = p.Character
-        if not c then continue end
-        local hrp = c:FindFirstChild("HumanoidRootPart")
+        local c   = p.Character
+        local hrp = c and c:FindFirstChild("HumanoidRootPart")
         if hrp then
-            hrp.Size        = cfg.hitbox
+            hrp.Size         = cfg.hitbox
                 and Vector3.new(cfg.hitbox_sz, cfg.hitbox_sz, cfg.hitbox_sz)
                 or  Vector3.new(2, 2, 1)
             hrp.Transparency = cfg.hitbox and 0.5 or 1
@@ -384,10 +306,7 @@ local function hitboxApply()
     end
 end
 
--- ══════════════════════════════════════════════
---  [6] BHOP
--- ══════════════════════════════════════════════
-
+-- ══ BHOP ══
 local bhopConn
 local function bhopToggle()
     if bhopConn then bhopConn:Disconnect(); bhopConn = nil end
@@ -397,21 +316,16 @@ local function bhopToggle()
         local h    = c and c:FindFirstChildOfClass("Humanoid")
         local root = c and c:FindFirstChild("HumanoidRootPart")
         if h and root then
-            -- Jump the frame velocity crosses zero upward
             if math.abs(root.Velocity.Y) < 2 then h.Jump = true end
         end
     end)
 end
 
--- ══════════════════════════════════════════════
---  [7] NOCLIP
--- ══════════════════════════════════════════════
-
+-- ══ NOCLIP ══
 local noclipConn
 local function noclipToggle()
     if noclipConn then noclipConn:Disconnect(); noclipConn = nil end
     if not cfg.noclip then
-        -- Restore collision
         local c = lp.Character
         if c then
             for _, p in ipairs(c:GetDescendants()) do
@@ -430,33 +344,23 @@ local function noclipToggle()
     end)
 end
 
--- ══════════════════════════════════════════════
---  [8] ANTİ-AFK
--- ══════════════════════════════════════════════
-
+-- ══ ANTİ-AFK ══
 local afkConn
 local function afkToggle()
     if afkConn then afkConn:Disconnect(); afkConn = nil end
     if not cfg.antiafk then return end
     afkConn = RunService.Heartbeat:Connect(function()
-        -- Simulate mouse micro-movement — AFK detection resets
-        VirtualUser:Button2Down(Vector2.new(0, 0), cam.CFrame)
-        VirtualUser:Button2Up(Vector2.new(0, 0), cam.CFrame)
+        VirtualUser:Button2Down(Vector2.new(0,0), cam.CFrame)
+        VirtualUser:Button2Up(Vector2.new(0,0), cam.CFrame)
     end)
 end
 
--- ══════════════════════════════════════════════
---  [9] FOV DEĞİŞTİRİCİ
--- ══════════════════════════════════════════════
-
+-- ══ FOV ══
 local function fovApply()
     cam.FieldOfView = cfg.fov_change and cfg.fov_val or 70
 end
 
--- ══════════════════════════════════════════════
---  [10] PLAYER TRACKER — MİNİHARİTA
--- ══════════════════════════════════════════════
-
+-- ══ MİNİHARİTA ══
 local trackerPool = {}
 local MAP_SIZE    = 150
 local MAP_PAD     = 10
@@ -469,180 +373,110 @@ end
 local function trackerDraw(typ, props)
     local d = Drawing.new(typ)
     for k, v in pairs(props) do d[k] = v end
-    trackerPool[#trackerPool + 1] = d
+    trackerPool[#trackerPool+1] = d
     return d
 end
 
 local function trackerUpdate()
     trackerClear()
     if not cfg.tracker then return end
-
     local vp  = cam.ViewportSize
     local mx  = vp.X - MAP_SIZE - MAP_PAD
     local my  = vp.Y - MAP_SIZE - MAP_PAD
-    local mid = Vector2.new(mx + MAP_SIZE * 0.5, my + MAP_SIZE * 0.5)
-
-    -- Background
-    trackerDraw("Square", {
-        Visible=true, Position=Vector2.new(mx, my),
-        Size=Vector2.new(MAP_SIZE, MAP_SIZE),
+    local mid = Vector2.new(mx + MAP_SIZE*0.5, my + MAP_SIZE*0.5)
+    trackerDraw("Square", {Visible=true, Position=Vector2.new(mx,my),
+        Size=Vector2.new(MAP_SIZE,MAP_SIZE),
         Color=Color3.fromRGB(10,10,15), Filled=true,
-        Thickness=0, Transparency=0.55,
-    })
-    trackerDraw("Square", {
-        Visible=true, Position=Vector2.new(mx, my),
-        Size=Vector2.new(MAP_SIZE, MAP_SIZE),
-        Color=Color3.fromRGB(220,40,55), Filled=false, Thickness=1.2,
-    })
-    trackerDraw("Text", {
-        Visible=true, Text="RAZE MAP",
-        Position=Vector2.new(mx + 4, my + 2),
-        Size=10, Color=Color3.fromRGB(220,40,55), Outline=true,
-    })
-
-    -- Self dot (white)
-    trackerDraw("Circle", {
-        Visible=true, Position=mid, Radius=4,
-        Color=Color3.new(1,1,1), Filled=true, Thickness=0,
-    })
-
+        Thickness=0, Transparency=0.55})
+    trackerDraw("Square", {Visible=true, Position=Vector2.new(mx,my),
+        Size=Vector2.new(MAP_SIZE,MAP_SIZE),
+        Color=Color3.fromRGB(220,40,55), Filled=false, Thickness=1.2})
+    trackerDraw("Text",   {Visible=true, Text="RAZE MAP",
+        Position=Vector2.new(mx+4,my+2),
+        Size=10, Color=Color3.fromRGB(220,40,55), Outline=true})
+    trackerDraw("Circle", {Visible=true, Position=mid, Radius=4,
+        Color=Color3.new(1,1,1), Filled=true, Thickness=0})
     local selfRoot = getHRP(lp)
     if not selfRoot then return end
-
-    -- Scale: 1 stud = MAP_SIZE / 500 pixels (covers ~250 stud radius)
-    local SCALE = MAP_SIZE / 500
-
+    local SCALE = MAP_SIZE/500
     for _, p in ipairs(enemies()) do
         local tr = getHRP(p)
         if not tr then continue end
-
-        local rel   = tr.Position - selfRoot.Position
-        local dotX  = math.clamp(rel.X * SCALE, -MAP_SIZE*0.5 + 6, MAP_SIZE*0.5 - 6)
-        local dotZ  = math.clamp(rel.Z * SCALE, -MAP_SIZE*0.5 + 6, MAP_SIZE*0.5 - 6)
-        local dotPos = Vector2.new(mid.X + dotX, mid.Y + dotZ)
-
-        trackerDraw("Circle", {
-            Visible=true, Position=dotPos, Radius=4,
-            Color=cfg.esp_color, Filled=true, Thickness=0,
-        })
-        trackerDraw("Text", {
-            Visible=true, Text=p.Name:sub(1, 8),
-            Position=Vector2.new(dotPos.X + 5, dotPos.Y - 7),
-            Size=9, Color=Color3.new(1,1,1), Outline=true,
-        })
+        local rel  = tr.Position - selfRoot.Position
+        local dotX = math.clamp(rel.X*SCALE, -MAP_SIZE*0.5+6, MAP_SIZE*0.5-6)
+        local dotZ = math.clamp(rel.Z*SCALE, -MAP_SIZE*0.5+6, MAP_SIZE*0.5-6)
+        local dp   = Vector2.new(mid.X+dotX, mid.Y+dotZ)
+        trackerDraw("Circle", {Visible=true, Position=dp, Radius=4,
+            Color=cfg.esp_color, Filled=true, Thickness=0})
+        trackerDraw("Text",   {Visible=true, Text=p.Name:sub(1,8),
+            Position=Vector2.new(dp.X+5, dp.Y-7),
+            Size=9, Color=Color3.new(1,1,1), Outline=true})
     end
 end
 
--- ══════════════════════════════════════════════
---  MENU SYSTEM
--- ══════════════════════════════════════════════
-
-local menu = {
-    open   = false,
-    x      = 120, y = 80,
-    w      = 500, h = 490,
-    tab    = 1,
-    draws  = {},
-    tabs   = { "COMBAT", "VISUAL", "MOVEMENT", "EXTRAS" },
-}
-
+-- ══ MENU ══
 local COL = {
-    bg1    = Color3.fromRGB(12, 12, 17),
-    bg2    = Color3.fromRGB(20, 20, 28),
-    bg3    = Color3.fromRGB(32, 32, 44),
-    accent = Color3.fromRGB(220, 40, 55),
-    white  = Color3.new(1, 1, 1),
-    gray   = Color3.fromRGB(135, 135, 150),
-    green  = Color3.fromRGB(50, 200, 80),
+    bg1    = Color3.fromRGB(12,12,17),
+    bg2    = Color3.fromRGB(20,20,28),
+    bg3    = Color3.fromRGB(32,32,44),
+    accent = Color3.fromRGB(220,40,55),
+    white  = Color3.new(1,1,1),
+    gray   = Color3.fromRGB(135,135,150),
+    green  = Color3.fromRGB(50,200,80),
 }
+local menu = {open=false, x=120, y=80, w=500, h=490, tab=1, draws={},
+    tabs={"COMBAT","VISUAL","MOVEMENT","EXTRAS"}}
 
 local isDrag = false
-local dragSX, dragSY, menuStartX, menuStartY = 0, 0, 0, 0
+local dragSX, dragSY, menuStartX, menuStartY = 0,0,0,0
+local toggleAreas = {}
+local sliderAreas = {}
 
 local function mD(typ, props)
     local d = Drawing.new(typ)
-    for k, v in pairs(props) do d[k] = v end
-    menu.draws[#menu.draws + 1] = d
+    for k,v in pairs(props) do d[k]=v end
+    menu.draws[#menu.draws+1] = d
     return d
 end
-
 local function menuClear()
     for _, d in ipairs(menu.draws) do d:Remove() end
     menu.draws = {}
 end
-
--- Returns true if (px,py) is inside a toggle and toggles it
-local toggleAreas = {}  -- filled each render, used in click handler
-
 local function drawToggle(label, val, x, y)
-    toggleAreas[#toggleAreas + 1] = {x=x, y=y, w=220, h=22}
-
-    mD("Square", {
-        Visible=true, Position=Vector2.new(x, y),
-        Size=Vector2.new(220, 22), Color=val and COL.bg3 or COL.bg2,
-        Filled=true, Thickness=0,
-    })
-    mD("Square", {
-        Visible=true, Position=Vector2.new(x, y),
-        Size=Vector2.new(220, 22), Color=val and COL.accent or COL.bg3,
-        Filled=false, Thickness=val and 1.5 or 1,
-    })
-    -- LED
-    mD("Square", {
-        Visible=true, Position=Vector2.new(x+204, y+5),
-        Size=Vector2.new(12, 12), Color=val and COL.green or COL.gray,
-        Filled=true, Thickness=0,
-    })
-    mD("Text", {
-        Visible=true, Text=label,
-        Position=Vector2.new(x+8, y+4),
-        Size=13, Color=val and COL.white or COL.gray, Outline=true,
-    })
+    toggleAreas[#toggleAreas+1] = {x=x, y=y, w=220, h=22}
+    mD("Square", {Visible=true, Position=Vector2.new(x,y),
+        Size=Vector2.new(220,22), Color=val and COL.bg3 or COL.bg2,
+        Filled=true, Thickness=0})
+    mD("Square", {Visible=true, Position=Vector2.new(x,y),
+        Size=Vector2.new(220,22), Color=val and COL.accent or COL.bg3,
+        Filled=false, Thickness=val and 1.5 or 1})
+    mD("Square", {Visible=true, Position=Vector2.new(x+204,y+5),
+        Size=Vector2.new(12,12), Color=val and COL.green or COL.gray,
+        Filled=true, Thickness=0})
+    mD("Text",   {Visible=true, Text=label,
+        Position=Vector2.new(x+8,y+4),
+        Size=13, Color=val and COL.white or COL.gray, Outline=true})
 end
-
-local function drawSlider(label, val, min, max, x, y, w)
+local function drawSlider(label, val, mn, mx, x, y, w)
     w = w or 220
-    local pct = math.clamp((val - min) / (max - min), 0, 1)
-    mD("Text", {
-        Visible=true,
-        Text=label .. ": " .. tostring(math.floor(val)),
-        Position=Vector2.new(x, y),
-        Size=12, Color=COL.white, Outline=true,
-    })
-    mD("Square", {
-        Visible=true, Position=Vector2.new(x, y+16),
-        Size=Vector2.new(w, 7), Color=COL.bg3,
-        Filled=true, Thickness=0,
-    })
-    mD("Square", {
-        Visible=true, Position=Vector2.new(x, y+16),
-        Size=Vector2.new(w * pct, 7), Color=COL.accent,
-        Filled=true, Thickness=0,
-    })
-    -- Knob
-    mD("Square", {
-        Visible=true,
-        Position=Vector2.new(x + w*pct - 4, y+13),
-        Size=Vector2.new(8, 13), Color=COL.white,
-        Filled=true, Thickness=0,
-    })
+    local pct = math.clamp((val-mn)/(mx-mn), 0, 1)
+    mD("Text",   {Visible=true, Text=label..": "..tostring(math.floor(val)),
+        Position=Vector2.new(x,y), Size=12, Color=COL.white, Outline=true})
+    mD("Square", {Visible=true, Position=Vector2.new(x,y+16),
+        Size=Vector2.new(w,7), Color=COL.bg3, Filled=true, Thickness=0})
+    mD("Square", {Visible=true, Position=Vector2.new(x,y+16),
+        Size=Vector2.new(w*pct,7), Color=COL.accent, Filled=true, Thickness=0})
+    mD("Square", {Visible=true, Position=Vector2.new(x+w*pct-4,y+13),
+        Size=Vector2.new(8,13), Color=COL.white, Filled=true, Thickness=0})
+end
+local function regSlider(x,y,w,mn,mx,key)
+    sliderAreas[#sliderAreas+1] = {x=x,y=y,w=w,min=mn,max=mx,key=key}
 end
 
-local sliderAreas = {}  -- { x, y, w, min, max, cfgKey }
-
-local function regSlider(x, y, w, mn, mx, key)
-    sliderAreas[#sliderAreas+1] = {x=x, y=y, w=w, min=mn, max=mx, key=key}
-end
-
--- Toggle config keys per tab, in order matching drawToggle calls
 local tabToggles = {
-    -- COMBAT
-    { "aimbot","silent_aim","killaura","hitbox","esp"},
-    -- VISUAL
-    { "esp","esp_boxes","esp_names","esp_health","esp_tracers","ghost","tracker","fov_change"},
-    -- MOVEMENT
-    { "speed","bhop","noclip","mevlana","antiafk"},
-    -- EXTRAS (keybinds display only)
+    {"aimbot","silent_aim","killaura","hitbox","esp"},
+    {"esp","esp_boxes","esp_names","esp_health","esp_tracers","ghost","tracker","fov_change"},
+    {"speed","bhop","noclip","mevlana","antiafk"},
     {},
 }
 
@@ -651,40 +485,29 @@ local function menuRender()
     toggleAreas = {}
     sliderAreas = {}
     if not menu.open then return end
+    local X,Y,W,H = menu.x, menu.y, menu.w, menu.h
 
-    local X, Y, W, H = menu.x, menu.y, menu.w, menu.h
-
-    -- Shadow
     mD("Square", {Visible=true, Position=Vector2.new(X+4,Y+4),
         Size=Vector2.new(W,H), Color=Color3.new(0,0,0),
         Filled=true, Thickness=0, Transparency=0.45})
-
-    -- Body
     mD("Square", {Visible=true, Position=Vector2.new(X,Y),
         Size=Vector2.new(W,H), Color=COL.bg1, Filled=true, Thickness=0})
-
-    -- Outer border
     mD("Square", {Visible=true, Position=Vector2.new(X,Y),
         Size=Vector2.new(W,H), Color=COL.accent, Filled=false, Thickness=1.5})
-
-    -- Header
     mD("Square", {Visible=true, Position=Vector2.new(X,Y),
         Size=Vector2.new(W,34), Color=COL.bg2, Filled=true, Thickness=0})
     mD("Square", {Visible=true, Position=Vector2.new(X,Y+34),
         Size=Vector2.new(W,2), Color=COL.accent, Filled=true, Thickness=0})
-
-    -- Title
-    mD("Text", {Visible=true, Text="▶ RAZE v1.0",
-        Position=Vector2.new(X+12, Y+9), Size=18,
+    mD("Text",   {Visible=true, Text="▶ RAZE v1.0",
+        Position=Vector2.new(X+12,Y+9), Size=18,
         Color=COL.accent, Outline=true})
-    mD("Text", {Visible=true, Text="INSERT = toggle  |  F1–F6 = hotkeys",
-        Position=Vector2.new(X+W-228, Y+11), Size=11,
+    mD("Text",   {Visible=true, Text="INSERT = toggle  |  F1–F6 = hotkeys",
+        Position=Vector2.new(X+W-228,Y+11), Size=11,
         Color=COL.gray, Outline=false})
 
-    -- Tabs
-    local tabW = W / #menu.tabs
+    local tabW = W/#menu.tabs
     for i, name in ipairs(menu.tabs) do
-        local tx    = X + (i-1)*tabW
+        local tx    = X+(i-1)*tabW
         local activ = menu.tab == i
         mD("Square", {Visible=true, Position=Vector2.new(tx,Y+36),
             Size=Vector2.new(tabW,28), Color=activ and COL.bg3 or COL.bg2,
@@ -695,347 +518,247 @@ local function menuRender()
                 Filled=true, Thickness=0})
         end
         mD("Text", {Visible=true, Text=name,
-            Position=Vector2.new(tx + tabW*0.5 - #name*3.8, Y+44),
+            Position=Vector2.new(tx+tabW*0.5-#name*3.8, Y+44),
             Size=13, Color=activ and COL.white or COL.gray, Outline=true})
     end
 
-    local cy  = Y + 74
-    local cx  = X + 12
-    local cx2 = X + W*0.5 + 8
+    local cy = Y+74
+    local cx  = X+12
+    local cx2 = X+W*0.5+8
 
-    -- ──── COMBAT ────
     if menu.tab == 1 then
         drawToggle("Aimbot  [RMB]", cfg.aimbot, cx, cy)
-        drawToggle("Silent Aim", cfg.silent_aim, cx2, cy);  cy = cy + 28
+        drawToggle("Silent Aim", cfg.silent_aim, cx2, cy);  cy=cy+28
         drawToggle("Kill Aura", cfg.killaura, cx, cy)
-        drawToggle("Hitbox Expander", cfg.hitbox, cx2, cy); cy = cy + 34
-
+        drawToggle("Hitbox Expander", cfg.hitbox, cx2, cy); cy=cy+34
         drawSlider("Aimbot FOV", cfg.aim_fov, 20, 300, cx, cy, 220)
-        regSlider(cx, cy+16, 220, 20, 300, "aim_fov");     cy = cy + 38
-
-        drawSlider("Aim Smoothing %", (1-cfg.aim_smooth)*100, 0, 100, cx, cy, 220)
-        -- smoothing stored inverted; slider just shows value
-        regSlider(cx, cy+16, 220, 0, 100, "_aim_smooth");  cy = cy + 38
-
-        drawSlider("Kill Aura Radius", cfg.aura_radius, 5, 60, cx, cy, 220)
-        regSlider(cx, cy+16, 220, 5, 60, "aura_radius");   cy = cy + 38
-
-        drawSlider("Kill Aura Damage", cfg.aura_dmg, 5, 100, cx, cy, 220)
-        regSlider(cx, cy+16, 220, 5, 100, "aura_dmg");     cy = cy + 38
-
+        regSlider(cx,cy+16,220,20,300,"aim_fov");           cy=cy+38
+        drawSlider("Aim Smooth %", (1-cfg.aim_smooth)*100, 0, 100, cx, cy, 220)
+        regSlider(cx,cy+16,220,0,100,"_aim_smooth");        cy=cy+38
+        drawSlider("Aura Radius", cfg.aura_radius, 5, 60, cx, cy, 220)
+        regSlider(cx,cy+16,220,5,60,"aura_radius");         cy=cy+38
+        drawSlider("Aura Damage", cfg.aura_dmg, 5, 100, cx, cy, 220)
+        regSlider(cx,cy+16,220,5,100,"aura_dmg");           cy=cy+38
         mD("Text", {Visible=true,
-            Text="Bone: " .. cfg.aim_bone .. "   (click to swap)",
-            Position=Vector2.new(cx, cy), Size=12,
+            Text="Bone: "..cfg.aim_bone.."   (click to swap)",
+            Position=Vector2.new(cx,cy), Size=12,
             Color=COL.white, Outline=true})
 
-    -- ──── VISUAL ────
     elseif menu.tab == 2 then
         drawToggle("ESP Master", cfg.esp, cx, cy)
-        drawToggle("ESP Boxes", cfg.esp_boxes, cx2, cy);    cy = cy + 28
+        drawToggle("ESP Boxes", cfg.esp_boxes, cx2, cy);       cy=cy+28
         drawToggle("ESP Names", cfg.esp_names, cx, cy)
-        drawToggle("ESP Health Bars", cfg.esp_health, cx2, cy); cy = cy + 28
+        drawToggle("ESP Health Bars", cfg.esp_health, cx2, cy);cy=cy+28
         drawToggle("ESP Tracers", cfg.esp_tracers, cx, cy)
-        drawToggle("Ghost Mode", cfg.ghost, cx2, cy);       cy = cy + 28
+        drawToggle("Ghost Mode", cfg.ghost, cx2, cy);          cy=cy+28
         drawToggle("Player Tracker", cfg.tracker, cx, cy)
-        drawToggle("FOV Changer", cfg.fov_change, cx2, cy); cy = cy + 34
-
+        drawToggle("FOV Changer", cfg.fov_change, cx2, cy);    cy=cy+34
         drawSlider("Field of View", cfg.fov_val, 30, 150, cx, cy, 220)
-        regSlider(cx, cy+16, 220, 30, 150, "fov_val");     cy = cy + 38
-
+        regSlider(cx,cy+16,220,30,150,"fov_val");              cy=cy+38
         drawSlider("Ghost Alpha %", cfg.ghost_alpha*100, 0, 95, cx, cy, 220)
-        regSlider(cx, cy+16, 220, 0, 95, "_ghost_alpha");  cy = cy + 38
-
+        regSlider(cx,cy+16,220,0,95,"_ghost_alpha");           cy=cy+38
         drawSlider("Hitbox Size", cfg.hitbox_sz, 2, 20, cx, cy, 220)
-        regSlider(cx, cy+16, 220, 2, 20, "hitbox_sz")
+        regSlider(cx,cy+16,220,2,20,"hitbox_sz")
 
-    -- ──── MOVEMENT ────
     elseif menu.tab == 3 then
         drawToggle("Speed Hack", cfg.speed, cx, cy)
-        drawToggle("Bhop", cfg.bhop, cx2, cy);              cy = cy + 28
+        drawToggle("Bhop", cfg.bhop, cx2, cy);                 cy=cy+28
         drawToggle("Noclip", cfg.noclip, cx, cy)
-        drawToggle("Mevlana Hilesi ∞", cfg.mevlana, cx2, cy); cy = cy + 28
-        drawToggle("Anti-AFK", cfg.antiafk, cx, cy);        cy = cy + 34
-
+        drawToggle("Mevlana ∞", cfg.mevlana, cx2, cy);         cy=cy+28
+        drawToggle("Anti-AFK", cfg.antiafk, cx, cy);           cy=cy+34
         drawSlider("Walk Speed", cfg.speed_val, 16, 250, cx, cy, 220)
-        regSlider(cx, cy+16, 220, 16, 250, "speed_val");   cy = cy + 38
-
+        regSlider(cx,cy+16,220,16,250,"speed_val");            cy=cy+38
         drawSlider("Mevlana RPM", cfg.mevlana_spd, 5, 300, cx, cy, 220)
-        regSlider(cx, cy+16, 220, 5, 300, "mevlana_spd")
+        regSlider(cx,cy+16,220,5,300,"mevlana_spd")
 
-    -- ──── EXTRAS / KEYBINDS ────
     elseif menu.tab == 4 then
         mD("Text", {Visible=true, Text="KEYBIND REFERENCE",
-            Position=Vector2.new(cx, cy), Size=14,
-            Color=COL.accent, Outline=true}); cy = cy + 22
-
+            Position=Vector2.new(cx,cy), Size=14,
+            Color=COL.accent, Outline=true}); cy=cy+22
         local binds = {
-            {"INSERT",  "Open / Close Menu"},
-            {"F1",      "Toggle ESP"},
-            {"F2",      "Toggle Aimbot"},
-            {"F3",      "Toggle Speed Hack"},
-            {"F4",      "Toggle Mevlana Hilesi"},
-            {"F5",      "Toggle Noclip"},
-            {"F6",      "Toggle Kill Aura"},
-            {"RMB",     "Aim (hold)"},
+            {"INSERT","Open / Close Menu"},
+            {"F1","Toggle ESP"},
+            {"F2","Toggle Aimbot"},
+            {"F3","Toggle Speed Hack"},
+            {"F4","Toggle Mevlana"},
+            {"F5","Toggle Noclip"},
+            {"F6","Toggle Kill Aura"},
+            {"RMB","Aim (hold)"},
         }
         for _, b in ipairs(binds) do
-            mD("Square", {Visible=true, Position=Vector2.new(cx, cy),
-                Size=Vector2.new(W-24, 20), Color=COL.bg2,
+            mD("Square", {Visible=true, Position=Vector2.new(cx,cy),
+                Size=Vector2.new(W-24,20), Color=COL.bg2,
                 Filled=true, Thickness=0})
             mD("Text", {Visible=true,
-                Text=("[%-8s] %s"):format(b[1], b[2]),
-                Position=Vector2.new(cx+6, cy+3),
+                Text=("[%-8s] %s"):format(b[1],b[2]),
+                Position=Vector2.new(cx+6,cy+3),
                 Size=13, Color=COL.white, Outline=true})
-            cy = cy + 24
+            cy=cy+24
         end
-
-        cy = cy + 10
-        mD("Text", {Visible=true,
-            Text="RAZE  |  one tap or no tap  |  bench cooked this",
-            Position=Vector2.new(cx, cy), Size=11,
-            Color=COL.gray, Outline=false})
     end
 
-    -- Footer line
-    mD("Square", {Visible=true, Position=Vector2.new(X, Y+H-22),
-        Size=Vector2.new(W,1), Color=COL.accent,
-        Filled=true, Thickness=0})
-    mD("Square", {Visible=true, Position=Vector2.new(X, Y+H-21),
-        Size=Vector2.new(W,21), Color=COL.bg2,
-        Filled=true, Thickness=0})
-    mD("Text", {Visible=true,
-        Text="RAZE v1.0  |  ESP · Aimbot · Speed · Mevlana · KillAura · Ghost · Hitbox · Silent · Bhop · Noclip · AFK · FOV · Map",
-        Position=Vector2.new(X+8, Y+H-15),
+    mD("Square", {Visible=true, Position=Vector2.new(X,Y+H-22),
+        Size=Vector2.new(W,1), Color=COL.accent, Filled=true, Thickness=0})
+    mD("Square", {Visible=true, Position=Vector2.new(X,Y+H-21),
+        Size=Vector2.new(W,21), Color=COL.bg2, Filled=true, Thickness=0})
+    mD("Text",   {Visible=true,
+        Text="RAZE v1.0  |  Xeno Build  |  INSERT=menu",
+        Position=Vector2.new(X+8,Y+H-15),
         Size=10, Color=COL.gray, Outline=false})
 end
 
--- ══════════════════════════════════════════════
---  WATERMARK HUD
--- ══════════════════════════════════════════════
-
-local wmDraws  = {}
-local fpsSmooth = 60
-
+-- ══ WATERMARK ══
+local wmDraws = {}
 local function wmClear()
     for _, d in ipairs(wmDraws) do d:Remove() end
     wmDraws = {}
 end
-
 local function wmRender(fps)
     wmClear()
-    local function W(t, p)
-        local d = Drawing.new(t)
+    local function W(t,p)
+        local d=Drawing.new(t)
         for k,v in pairs(p) do d[k]=v end
-        wmDraws[#wmDraws+1] = d
+        wmDraws[#wmDraws+1]=d
     end
     W("Square", {Visible=true, Position=Vector2.new(5,5),
-        Size=Vector2.new(270,22), Color=COL.bg1,
-        Filled=true, Thickness=0})
+        Size=Vector2.new(270,22), Color=COL.bg1, Filled=true, Thickness=0})
     W("Square", {Visible=true, Position=Vector2.new(5,5),
-        Size=Vector2.new(270,22), Color=COL.accent,
-        Filled=false, Thickness=1.4})
-    W("Text", {Visible=true,
+        Size=Vector2.new(270,22), Color=COL.accent, Filled=false, Thickness=1.4})
+    W("Text",   {Visible=true,
         Text=("RAZE  |  %s  |  %d fps"):format(lp.Name, math.floor(fps)),
-        Position=Vector2.new(10,9), Size=12,
-        Color=COL.white, Outline=true})
+        Position=Vector2.new(10,9), Size=12, Color=COL.white, Outline=true})
 end
 
--- ══════════════════════════════════════════════
---  INPUT — MENU TOGGLE + HOTKEYS + CLICKS
--- ══════════════════════════════════════════════
-
+-- ══ INPUT ══
 local function applyToggleSideEffects(key)
-    if key == "speed"    then speedApply()    end
-    if key == "bhop"     then bhopToggle()    end
-    if key == "noclip"   then noclipToggle()  end
-    if key == "mevlana"  then mevlanaToggle() end
-    if key == "antiafk"  then afkToggle()     end
-    if key == "fov_change" then fovApply()    end
+    if key=="speed"      then speedApply()    end
+    if key=="bhop"       then bhopToggle()    end
+    if key=="noclip"     then noclipToggle()  end
+    if key=="mevlana"    then mevlanaToggle() end
+    if key=="antiafk"    then afkToggle()     end
+    if key=="fov_change" then fovApply()      end
 end
 
 UserInputService.InputBegan:Connect(function(inp, gpe)
-    -- Hard keybinds
     if inp.KeyCode == Enum.KeyCode.Insert then
-        menu.open = not menu.open
-        menuRender()
-        return
+        menu.open = not menu.open; menuRender(); return
     end
-    if inp.KeyCode == Enum.KeyCode.F1 then
-        cfg.esp = not cfg.esp; menuRender()
-    elseif inp.KeyCode == Enum.KeyCode.F2 then
-        cfg.aimbot = not cfg.aimbot; menuRender()
-    elseif inp.KeyCode == Enum.KeyCode.F3 then
-        cfg.speed = not cfg.speed; speedApply(); menuRender()
-    elseif inp.KeyCode == Enum.KeyCode.F4 then
-        cfg.mevlana = not cfg.mevlana; mevlanaToggle(); menuRender()
-    elseif inp.KeyCode == Enum.KeyCode.F5 then
-        cfg.noclip = not cfg.noclip; noclipToggle(); menuRender()
-    elseif inp.KeyCode == Enum.KeyCode.F6 then
-        cfg.killaura = not cfg.killaura; menuRender()
+    if inp.KeyCode == Enum.KeyCode.F1 then cfg.esp=not cfg.esp; menuRender()
+    elseif inp.KeyCode == Enum.KeyCode.F2 then cfg.aimbot=not cfg.aimbot; menuRender()
+    elseif inp.KeyCode == Enum.KeyCode.F3 then cfg.speed=not cfg.speed; speedApply(); menuRender()
+    elseif inp.KeyCode == Enum.KeyCode.F4 then cfg.mevlana=not cfg.mevlana; mevlanaToggle(); menuRender()
+    elseif inp.KeyCode == Enum.KeyCode.F5 then cfg.noclip=not cfg.noclip; noclipToggle(); menuRender()
+    elseif inp.KeyCode == Enum.KeyCode.F6 then cfg.killaura=not cfg.killaura; menuRender()
     end
-
     if not menu.open then return end
-
     if inp.UserInputType == Enum.UserInputType.MouseButton1 then
         local mx, my = inp.Position.X, inp.Position.Y
-
-        -- Drag (header)
-        if mx >= menu.x and mx <= menu.x+menu.w
-           and my >= menu.y and my <= menu.y+34 then
-            isDrag     = true
-            dragSX     = mx; dragSY = my
-            menuStartX = menu.x; menuStartY = menu.y
-            return
+        if mx>=menu.x and mx<=menu.x+menu.w
+           and my>=menu.y and my<=menu.y+34 then
+            isDrag=true; dragSX=mx; dragSY=my
+            menuStartX=menu.x; menuStartY=menu.y; return
         end
-
-        -- Tab click
-        local tabW = menu.w / #menu.tabs
-        if my >= menu.y+36 and my <= menu.y+64 then
-            for i = 1, #menu.tabs do
-                local tx = menu.x + (i-1)*tabW
-                if mx >= tx and mx <= tx+tabW then
-                    menu.tab = i
-                    menuRender()
-                    return
+        local tabW = menu.w/#menu.tabs
+        if my>=menu.y+36 and my<=menu.y+64 then
+            for i=1,#menu.tabs do
+                local tx=menu.x+(i-1)*tabW
+                if mx>=tx and mx<=tx+tabW then
+                    menu.tab=i; menuRender(); return
                 end
             end
         end
-
-        -- Bone swap text click (combat tab, last row)
-        if menu.tab == 1 then
-            local boneY = menu.y + 74 + 28 + 34 + 38*4
-            if mx >= menu.x+12 and mx <= menu.x+menu.w-12
-               and my >= boneY and my <= boneY+16 then
-                cfg.aim_bone = cfg.aim_bone == "Head" and "HumanoidRootPart" or "Head"
-                menuRender()
-                return
+        if menu.tab==1 then
+            local boneY = menu.y+74+28+34+38*4
+            if mx>=menu.x+12 and mx<=menu.x+menu.w-12
+               and my>=boneY and my<=boneY+16 then
+                cfg.aim_bone = cfg.aim_bone=="Head" and "HumanoidRootPart" or "Head"
+                menuRender(); return
             end
         end
-
-        -- Toggle clicks
-        local tabKeys   = tabToggles[menu.tab]
-        local toggleIdx = 0
+        local tabKeys  = tabToggles[menu.tab]
+        local tidx     = 0
         for _, area in ipairs(toggleAreas) do
-            toggleIdx = toggleIdx + 1
-            local k = tabKeys[toggleIdx]
-            if k and mx >= area.x and mx <= area.x+area.w
-               and my >= area.y and my <= area.y+area.h then
-                cfg[k] = not cfg[k]
-                applyToggleSideEffects(k)
-                menuRender()
-                return
+            tidx = tidx+1
+            local k = tabKeys[tidx]
+            if k and mx>=area.x and mx<=area.x+area.w
+               and my>=area.y and my<=area.y+area.h then
+                cfg[k]=not cfg[k]; applyToggleSideEffects(k); menuRender(); return
             end
         end
-
-        -- Slider clicks
         for _, sl in ipairs(sliderAreas) do
-            if mx >= sl.x and mx <= sl.x+sl.w
-               and my >= sl.y and my <= sl.y+7 then
-                local pct = (mx - sl.x) / sl.w
-                local val = sl.min + (sl.max - sl.min) * pct
-
-                if sl.key == "_aim_smooth" then
-                    cfg.aim_smooth = 1 - (val / 100)
-                elseif sl.key == "_ghost_alpha" then
-                    cfg.ghost_alpha = val / 100
+            if mx>=sl.x and mx<=sl.x+sl.w
+               and my>=sl.y and my<=sl.y+7 then
+                local pct = (mx-sl.x)/sl.w
+                local val = sl.min+(sl.max-sl.min)*pct
+                if sl.key=="_aim_smooth" then
+                    cfg.aim_smooth = 1-(val/100)
+                elseif sl.key=="_ghost_alpha" then
+                    cfg.ghost_alpha = val/100
                 else
-                    cfg[sl.key] = math.floor(val)
+                    cfg[sl.key]=math.floor(val)
                     applyToggleSideEffects(sl.key)
                 end
-                menuRender()
-                return
+                menuRender(); return
             end
         end
     end
 end)
 
 UserInputService.InputChanged:Connect(function(inp)
-    if isDrag and inp.UserInputType == Enum.UserInputType.MouseMovement then
-        menu.x = menuStartX + (inp.Position.X - dragSX)
-        menu.y = menuStartY + (inp.Position.Y - dragSY)
+    if isDrag and inp.UserInputType==Enum.UserInputType.MouseMovement then
+        menu.x = menuStartX+(inp.Position.X-dragSX)
+        menu.y = menuStartY+(inp.Position.Y-dragSY)
         menuRender()
     end
 end)
-
 UserInputService.InputEnded:Connect(function(inp)
-    if inp.UserInputType == Enum.UserInputType.MouseButton1 then
-        isDrag = false
-    end
+    if inp.UserInputType==Enum.UserInputType.MouseButton1 then isDrag=false end
 end)
 
--- ══════════════════════════════════════════════
---  PLAYER HOOKS
--- ══════════════════════════════════════════════
-
+-- ══ PLAYER HOOKS ══
 local function hookPlayer(p)
     p.CharacterAdded:Connect(function()
         task.wait(0.5)
-        if cfg.hitbox  then hitboxApply() end
-        if cfg.ghost   then ghostApply()  end
+        if cfg.hitbox then hitboxApply() end
+        if cfg.ghost  then ghostApply()  end
     end)
 end
-
 for _, p in ipairs(Players:GetPlayers()) do
-    if p ~= lp then hookPlayer(p) end
+    if p~=lp then hookPlayer(p) end
 end
 Players.PlayerAdded:Connect(hookPlayer)
 Players.PlayerRemoving:Connect(function(p) espRemove(p) end)
 
--- ══════════════════════════════════════════════
---  MAIN LOOP
--- ══════════════════════════════════════════════
-
-local frames   = 0
-local lastFPS  = tick()
-local smoothFPS= 60
+-- ══ MAIN LOOP ══
+local frames    = 0
+local smoothFPS = 60
 
 RunService.Heartbeat:Connect(function(dt)
-    frames = frames + 1
+    frames    = frames+1
+    smoothFPS = smoothFPS+(1/dt-smoothFPS)*0.05
 
-    -- FPS
-    smoothFPS = smoothFPS + (1/dt - smoothFPS) * 0.05
-
-    -- ESP
     espUpdate()
-
-    -- Aimbot + FOV circle
     aimbotUpdate()
-
-    -- Kill aura
     killAuraUpdate()
-
-    -- Speed maintenance
     if cfg.speed then speedApply() end
 
-    -- Ghost + hitbox (not every frame, expensive)
-    if frames % 8 == 0 then
+    if frames%8==0 then
         if cfg.ghost  then ghostApply()  end
         if cfg.hitbox then hitboxApply() end
         fovApply()
     end
-
-    -- Tracker (minimap)
-    if frames % 4 == 0 then
-        trackerUpdate()
-    end
-
-    -- Watermark FPS update every 30 frames
-    if frames % 30 == 0 then
-        wmRender(smoothFPS)
-    end
+    if frames%4==0 then trackerUpdate() end
+    if frames%30==0 then wmRender(smoothFPS) end
 end)
 
--- ══════════════════════════════════════════════
---  INIT
--- ══════════════════════════════════════════════
-
+-- ══ INIT ══
 wmRender(60)
 menuRender()
-
-StarterGui:SetCore("SendNotification", {
-    Title    = "RAZE v1.0",
-    Text     = "Loaded. INSERT = menu | F1-F6 hotkeys",
-    Duration = 5,
-})
-
-print("RAZE v1.0 loaded clean — bench out")
+pcall(function()
+    StarterGui:SetCore("SendNotification", {
+        Title    = "RAZE v1.0",
+        Text     = "Yüklendi. INSERT = menü | F1-F6 kısayollar",
+        Duration = 5,
+    })
+end)
+print("RAZE v1.0 Xeno build — temiz")
