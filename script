@@ -15,7 +15,7 @@
              Hitbox Expander · Silent Aim · Bhop
              Noclip · Anti-AFK · FOV Changer
              Player Tracker (minimap)
-  Keybind  : INSERT = menu | F1–F6 = hotkeys
+  Keybind  : RightShift = menu | F1–F6 = hotkeys
 --]]
 
 -- ══════════════════════════════════════════════
@@ -1332,7 +1332,7 @@ switchTab(1)
 --  MENU OPEN / CLOSE (INSERT key)
 -- ══════════════════════════════════════════════
 
-local menuOpen = false
+local menuOpen = true
 
 local function setMenu(open)
     menuOpen = open
